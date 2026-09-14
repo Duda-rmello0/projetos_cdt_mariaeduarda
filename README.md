@@ -1,2 +1,2 @@
-# projetos_cdt
-Repositório dedicado ao estudo e prática de Metodologias Ágeis. Este espaço visa compartilhar conhecimento sobre os frameworks mais populares (Scrum, Kanban, etc.), princípios de desenvolvimento ágil e ferramentas que promovem flexibilidade e eficiência. Sinta-se à vontade para explorar, aprender e contribuir!
+# two_project_august_pair-programming
+A hands-on repository for learning essential Python and algorithm concepts using the Pair Programming methodology. Designed for beginners to build problem-solving skills and code together.
