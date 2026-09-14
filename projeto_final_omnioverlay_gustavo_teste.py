@@ -1,6 +1,6 @@
 """
 ===============================================================================
-PROJETO: OmniOverlay - Premium Theme Engine, AI Assistant, Hub & CPU Monitor
+PROJETO: OmniOverlay - Theme Engine, Custom Backgrounds & Flexible Layouts
 ===============================================================================
 """
 
@@ -13,20 +13,20 @@ import webbrowser
 import threading
 import customtkinter as ctk
 from tkinter import filedialog
-from PIL import Image
+from PIL import Image, ImageTk
 from tkVideoPlayer import TkinterVideo
 
-# Bibliotecas adicionais para monitoramento e atalhos de teclado
 import psutil
 from pynput import keyboard
 
 CONFIG_FILE = "app_config.json"
 
+# Definições Universais de Cores (Claro / Escuro)
 COLOR_TEXT_PRIMARY = ("#0F172A", "#F8FAFC")
 COLOR_TEXT_SECONDARY = ("#475569", "#94A3B8")
-COLOR_BG_SURFACE = ("#FFFFFF", "#151C28")
+COLOR_BG_SURFACE = ("#F8FAFC", "#0F172A")
 COLOR_BG_CARD = ("#E2E8F0", "#1E293B")
-COLOR_INPUT_BG = ("#FFFFFF", "#0F172A")
+COLOR_INPUT_BG = ("#FFFFFF", "#1E293B")
 COLOR_BORDER = ("#CBD5E1", "#334155")
 
 COLOR_ACCENTS = {
@@ -38,7 +38,7 @@ COLOR_ACCENTS = {
 
 
 class AccountManager:
-    """Gerencia leitura e gravação dos perfis e atalhos."""
+    """Gerencia leitura e gravação dos perfis e configurações."""
 
     @staticmethod
     def carregar_dados():
@@ -48,10 +48,10 @@ class AccountManager:
                     dados = json.load(f)
                     if "perfis" in dados and len(dados["perfis"]) > 0:
                         for p in dados["perfis"]:
-                            if "atalhos_custom" not in p:
-                                p["atalhos_custom"] = []
-                            if "foto_perfil" not in p:
-                                p["foto_perfil"] = ""
+                            p.setdefault("atalhos_custom", [])
+                            p.setdefault("foto_perfil", "")
+                            p.setdefault("fundo_imagem", "")
+                            p.setdefault("modo_layout", "grid")  # 'grid' ou 'lista'
                         return dados
             except Exception as e:
                 print(f"[ERRO] Falha ao ler arquivo de configuração: {e}")
@@ -63,6 +63,8 @@ class AccountManager:
                     "nome": "Jogador Principal",
                     "cor_acento": "azul",
                     "foto_perfil": "",
+                    "fundo_imagem": "",
+                    "modo_layout": "grid",
                     "atalhos_custom": []
                 }
             ],
@@ -176,7 +178,7 @@ class ProfileSelectorFrame(ctk.CTkFrame):
                 width=42,
                 height=42,
                 corner_radius=21,
-                fg_color=("#CBD5E1", "#334155"),
+                fg_color=COLOR_BG_SURFACE,
                 text_color=COLOR_TEXT_PRIMARY,
                 font=("Segoe UI", 16),
             )
@@ -219,6 +221,8 @@ class ProfileSelectorFrame(ctk.CTkFrame):
             "nome": nome,
             "cor_acento": "azul",
             "foto_perfil": "",
+            "fundo_imagem": "",
+            "modo_layout": "grid",
             "atalhos_custom": []
         }
 
@@ -230,7 +234,7 @@ class ProfileSelectorFrame(ctk.CTkFrame):
 
 
 class DashboardFrame(ctk.CTkFrame):
-    """Painel Principal Dashboard Overlay com Player, IA e Monitor de Recursos."""
+    """Painel Principal Dashboard Overlay."""
 
     def __init__(self, parent, controller):
         super().__init__(parent, fg_color=COLOR_BG_SURFACE, corner_radius=12)
@@ -242,10 +246,17 @@ class DashboardFrame(ctk.CTkFrame):
         self.dynamic_accent_buttons = []
         self.icone_foto_temp = ""
 
+        self.lbl_fundo_bg = None
+
         self.criar_interface()
         self.atualizar_monitor_sistema()
 
     def criar_interface(self):
+        # Label para renderizar a Imagem de Fundo (Background)
+        self.lbl_fundo_bg = ctk.CTkLabel(self, text="", fg_color="transparent")
+        self.lbl_fundo_bg.place(x=0, y=0, relwidth=1, relheight=1)
+        self.lbl_fundo_bg.lower()
+
         # Header Organizado
         self.header_frame = ctk.CTkFrame(
             self,
@@ -260,7 +271,6 @@ class DashboardFrame(ctk.CTkFrame):
         self.header_frame.bind("<Button-1>", self.iniciar_arraste)
         self.header_frame.bind("<B1-Motion>", self.arrastar_janela)
 
-        # Lado Esquerdo - Perfil & Título
         self.btn_avatar = ctk.CTkButton(
             self.header_frame,
             text="👤",
@@ -283,7 +293,7 @@ class DashboardFrame(ctk.CTkFrame):
         )
         self.lbl_titulo.pack(side="left", padx=2)
 
-        # Centro - Monitor de CPU e RAM Compacto
+        # Monitor de Hardware
         self.frame_hardware = ctk.CTkFrame(
             self.header_frame,
             fg_color=COLOR_BG_CARD,
@@ -308,7 +318,7 @@ class DashboardFrame(ctk.CTkFrame):
         )
         self.lbl_ram.pack(side="left", padx=(0, 8))
 
-        # Lado Direito - Controles e Ações
+        # Botões de Ação
         btn_fechar = ctk.CTkButton(
             self.header_frame,
             text="✕",
@@ -328,8 +338,8 @@ class DashboardFrame(ctk.CTkFrame):
             width=32,
             height=32,
             corner_radius=8,
-            fg_color=("#CBD5E1", "#334155"),
-            hover_color=("#94A3B8", "#475569"),
+            fg_color=COLOR_BG_CARD,
+            hover_color=("#CBD5E1", "#334155"),
             text_color=COLOR_TEXT_PRIMARY,
             font=("Segoe UI", 12),
             command=self.controller.alternar_tema_global,
@@ -356,15 +366,15 @@ class DashboardFrame(ctk.CTkFrame):
             width=85,
             height=32,
             corner_radius=8,
-            fg_color=("#CBD5E1", "#334155"),
-            hover_color=("#94A3B8", "#475569"),
+            fg_color=COLOR_BG_CARD,
+            hover_color=("#CBD5E1", "#334155"),
             text_color=COLOR_TEXT_PRIMARY,
             font=("Segoe UI", 10, "bold"),
             command=self.controller.abrir_seletor_perfis,
         )
         btn_trocar_conta.pack(side="right", padx=4)
 
-        # Barra de Pesquisa / Lançador Universal
+        # Barra de Pesquisa
         self.frame_busca = ctk.CTkFrame(
             self,
             fg_color=COLOR_BG_SURFACE,
@@ -392,8 +402,8 @@ class DashboardFrame(ctk.CTkFrame):
             text="📁 Buscar App",
             width=100,
             height=38,
-            fg_color=("#CBD5E1", "#334155"),
-            hover_color=("#94A3B8", "#475569"),
+            fg_color=COLOR_BG_CARD,
+            hover_color=("#CBD5E1", "#334155"),
             text_color=COLOR_TEXT_PRIMARY,
             command=self.selecionar_executavel_direto,
         )
@@ -412,7 +422,7 @@ class DashboardFrame(ctk.CTkFrame):
         btn_executar.pack(side="right", padx=8, pady=8)
         self.dynamic_accent_buttons.append(btn_executar)
 
-        # Abas Principais
+        # Abas
         self.tabview = ctk.CTkTabview(
             self,
             corner_radius=12,
@@ -433,8 +443,29 @@ class DashboardFrame(ctk.CTkFrame):
         self.montar_aba_player_video()
         self.montar_aba_config()
 
+    def atualizar_fundo_tela(self, caminho_img):
+        """Aplica uma imagem de fundo customizada ou limpa o fundo."""
+        if caminho_img and os.path.exists(caminho_img):
+            try:
+                pil_img = Image.open(caminho_img)
+                # Redimensiona para o tamanho padrão da janela
+                pil_img = pil_img.resize((920, 800), Image.Resampling.LANCZOS)
+                ctk_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(920, 800))
+                self.lbl_fundo_bg.configure(image=ctk_img)
+                return
+            except Exception as e:
+                print(f"[ERRO] Falha ao carregar fundo de tela: {e}")
+
+        self.lbl_fundo_bg.configure(image="")
+
+    def carregar_perfil(self, perfil):
+        self.lbl_titulo.configure(text=f"OmniOverlay - {perfil['nome']}")
+        self.aplicar_cor_acento(perfil.get("cor_acento", "azul"))
+        self.atualizar_foto_avatar(perfil.get("foto_perfil", ""))
+        self.atualizar_fundo_tela(perfil.get("fundo_imagem", ""))
+        self.atualizar_atalhos_customizados()
+
     def atualizar_monitor_sistema(self):
-        """Atualiza o uso de CPU, RAM e Hardware em tempo real."""
         try:
             cpu_usage = psutil.cpu_percent(interval=None)
             ram = psutil.virtual_memory()
@@ -460,15 +491,9 @@ class DashboardFrame(ctk.CTkFrame):
                 self.bar_ram_detalhada.configure(progress_color=cor_ram)
 
         except Exception as e:
-            print(f"[MONITOR] Erro ao obter dados do sistema: {e}")
+            print(f"[MONITOR] Erro: {e}")
 
         self.after(1500, self.atualizar_monitor_sistema)
-
-    def carregar_perfil(self, perfil):
-        self.lbl_titulo.configure(text=f"OmniOverlay - {perfil['nome']}")
-        self.aplicar_cor_acento(perfil.get("cor_acento", "azul"))
-        self.atualizar_foto_avatar(perfil.get("foto_perfil", ""))
-        self.atualizar_atalhos_customizados()
 
     def atualizar_foto_avatar(self, foto_path):
         if foto_path and os.path.exists(foto_path):
@@ -529,7 +554,7 @@ class DashboardFrame(ctk.CTkFrame):
             self.controller.centralizar_janela(920, 800)
 
     # =========================================================================
-    # ABA 1: HUB DE ATALHOS (CORRIGIDO PARA O MODO CLARO)
+    # ABA 1: CENTRAL DE ATALHOS & LAYOUTS CUSTOMIZÁVEIS
     # =========================================================================
     def montar_aba_hub(self):
         frame_adicionar = ctk.CTkFrame(self.tab_hub, fg_color=COLOR_BG_CARD, corner_radius=10)
@@ -570,7 +595,7 @@ class DashboardFrame(ctk.CTkFrame):
             text="💻 Buscar App",
             width=100,
             height=32,
-            fg_color=("#CBD5E1", "#334155"),
+            fg_color=COLOR_BG_SURFACE,
             text_color=COLOR_TEXT_PRIMARY,
             command=self.procurar_app_para_atalho,
         )
@@ -599,7 +624,7 @@ class DashboardFrame(ctk.CTkFrame):
             text="🖼️ Foto Custom",
             width=110,
             height=30,
-            fg_color=("#CBD5E1", "#334155"),
+            fg_color=COLOR_BG_SURFACE,
             text_color=COLOR_TEXT_PRIMARY,
             command=self.escolher_foto_icone_atalho,
         )
@@ -634,46 +659,62 @@ class DashboardFrame(ctk.CTkFrame):
         self.scroll_custom = ctk.CTkScrollableFrame(self.cat_custom, fg_color="transparent")
         self.scroll_custom.pack(fill="both", expand=True)
 
-        self.grid_custom = ctk.CTkFrame(self.scroll_custom, fg_color="transparent")
-        self.grid_custom.pack(fill="x", pady=4)
+        self.container_custom_items = ctk.CTkFrame(self.scroll_custom, fg_color="transparent")
+        self.container_custom_items.pack(fill="x", pady=4)
 
         self.montar_categoria_estatica(self.cat_media, [
-            ("🟢 Spotify", "https://open.spotify.com", "#1DB954"),
-            ("▶️ YouTube", "https://www.youtube.com", "#FF0000"),
-            ("🔴 Netflix", "https://www.netflix.com", "#E50914"),
-            ("💜 Twitch", "https://www.twitch.tv", "#9146FF"),
-            ("📦 Prime Video", "https://www.primevideo.com", "#00A8E1"),
-            ("💬 WhatsApp Web", "https://web.whatsapp.com", "#25D366"),
-            ("🎵 Soundcloud", "https://soundcloud.com", "#FF5500"),
-            ("📺 Disney+", "https://www.disneyplus.com", "#113CCF"),
+            ("🟢 Spotify", "https://open.spotify.com"),
+            ("▶️ YouTube", "https://www.youtube.com"),
+            ("🔴 Netflix", "https://www.netflix.com"),
+            ("💜 Twitch", "https://www.twitch.tv"),
+            ("📦 Prime Video", "https://www.primevideo.com"),
+            ("💬 WhatsApp Web", "https://web.whatsapp.com"),
+            ("🎵 Soundcloud", "https://soundcloud.com"),
+            ("📺 Disney+", "https://www.disneyplus.com"),
         ])
 
         self.montar_categoria_estatica(self.cat_games, [
-            ("🚀 Steam", "steam://open/main", "#171A21"),
-            ("🛡️ Epic Games", "epicgames://", "#2A2A2A"),
-            ("💬 Discord", "https://discord.com/app", "#5865F2"),
-            ("🎮 Roblox", "https://www.roblox.com", "#000000"),
-            ("🔴 Roblox App", "roblox://", "#E22B26"),
-            ("🌐 Poki Jogos", "https://poki.com", "#0099FF"),
+            ("🚀 Steam", "steam://open/main"),
+            ("🛡️ Epic Games", "epicgames://"),
+            ("💬 Discord", "https://discord.com/app"),
+            ("🎮 Roblox", "https://www.roblox.com"),
+            ("🔴 Roblox App", "roblox://"),
+            ("🌐 Poki Jogos", "https://poki.com"),
         ])
 
         self.montar_categoria_estatica(self.cat_tools, [
-            ("📁 Gerenciador de Arquivos", "explorer.exe", "#0078D4"),
-            ("⚙️ Configurações do Windows", "ms-settings:", "#0078D4"),
-            ("📝 Bloco de Notas", "notepad.exe", "#475569"),
-            ("🌐 Google Chrome", "https://www.google.com", "#4285F4"),
-            ("💻 Prompt de Comando", "cmd.exe", "#1E293B"),
-            ("⚡ Gerenciador de Tarefas", "taskmgr.exe", "#16A34A"),
+            ("📁 Gerenciador de Arquivos", "explorer.exe"),
+            ("⚙️ Configurações do Windows", "ms-settings:"),
+            ("📝 Bloco de Notas", "notepad.exe"),
+            ("🌐 Google Chrome", "https://www.google.com"),
+            ("💻 Prompt de Comando", "cmd.exe"),
+            ("⚡ Gerenciador de Tarefas", "taskmgr.exe"),
         ])
 
     def montar_categoria_estatica(self, container, lista_atalhos):
         scroll = ctk.CTkScrollableFrame(container, fg_color="transparent")
         scroll.pack(fill="both", expand=True, padx=4, pady=4)
-        self.criar_cards_grid(scroll, lista_atalhos)
+
+        for nome, alvo in lista_atalhos:
+            btn = ctk.CTkButton(
+                scroll,
+                text=nome,
+                height=38,
+                corner_radius=8,
+                fg_color=COLOR_BG_CARD,
+                hover_color=("#CBD5E1", "#334155"),
+                text_color=COLOR_TEXT_PRIMARY,
+                border_color=COLOR_BORDER,
+                border_width=1,
+                font=("Segoe UI", 11, "bold"),
+                anchor="w",
+                command=lambda a=alvo: self.abrir_inteligente(a)
+            )
+            btn.pack(fill="x", pady=3, padx=4)
 
     def procurar_app_para_atalho(self):
         caminho = filedialog.askopenfilename(
-            title="Selecione o Executável ou Atalho do Programa",
+            title="Selecione o Executável",
             filetypes=[("Executáveis e Atalhos", "*.exe *.lnk *.bat *.cmd"), ("Todos os Arquivos", "*.*")]
         )
         if caminho:
@@ -685,7 +726,7 @@ class DashboardFrame(ctk.CTkFrame):
 
     def escolher_foto_icone_atalho(self):
         caminho = filedialog.askopenfilename(
-            title="Escolha uma imagem para o ícone do atalho",
+            title="Escolha uma imagem para o ícone",
             filetypes=[("Imagens", "*.png *.jpg *.jpeg *.ico *.bmp")]
         )
         if caminho:
@@ -737,8 +778,17 @@ class DashboardFrame(ctk.CTkFrame):
             AccountManager.salvar_dados(self.controller.dados_config)
             self.atualizar_atalhos_customizados()
 
+    def alterar_modo_layout(self, modo):
+        """Altera a visualização entre 'grid' e 'lista'."""
+        perfil = self.controller.perfil_ativo
+        if perfil:
+            perfil["modo_layout"] = modo
+            AccountManager.salvar_dados(self.controller.dados_config)
+            self.atualizar_atalhos_customizados()
+
     def atualizar_atalhos_customizados(self):
-        for widget in self.grid_custom.winfo_children():
+        """Renderiza os atalhos no modo Lista ou Grid."""
+        for widget in self.container_custom_items.winfo_children():
             widget.destroy()
 
         perfil = self.controller.perfil_ativo
@@ -746,87 +796,149 @@ class DashboardFrame(ctk.CTkFrame):
             return
 
         lista = perfil.get("atalhos_custom", [])
+        modo_layout = perfil.get("modo_layout", "grid")
 
         if not lista:
             lbl_vazio = ctk.CTkLabel(
-                self.grid_custom,
-                text="Nenhum atalho personalizado criado ainda. Adicione no campo acima!",
+                self.container_custom_items,
+                text="Nenhum atalho personalizado criado ainda.",
                 text_color=COLOR_TEXT_SECONDARY,
                 font=("Segoe UI", 11)
             )
             lbl_vazio.pack(anchor="w", padx=8, pady=12)
             return
 
-        for idx, item in enumerate(lista):
-            card_frame = ctk.CTkFrame(
-                self.grid_custom,
-                fg_color=COLOR_BG_CARD,
-                border_color=COLOR_BORDER,
-                border_width=1,
-                corner_radius=8
-            )
-            card_frame.pack(fill="x", pady=3, padx=4)
+        # Modo Grid (Grade lado a lado)
+        if modo_layout == "grid":
+            grid_frame = ctk.CTkFrame(self.container_custom_items, fg_color="transparent")
+            grid_frame.pack(fill="x", expand=True)
 
-            foto_icon = item.get("foto_icone", "")
-            img_obj = None
-            if foto_icon and os.path.exists(foto_icon):
-                try:
-                    pil_img = Image.open(foto_icon)
-                    img_obj = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(20, 20))
-                except Exception:
-                    img_obj = None
+            cols = 2
+            for idx, item in enumerate(lista):
+                r = idx // cols
+                c = idx % cols
 
-            prefixo_icone = item.get("icone", "🎮")
-            texto_exibicao = f"{prefixo_icone} {item['nome']}" if not img_obj else f" {item['nome']}"
+                card_frame = ctk.CTkFrame(
+                    grid_frame,
+                    fg_color=COLOR_BG_CARD,
+                    border_color=COLOR_BORDER,
+                    border_width=1,
+                    corner_radius=8
+                )
+                card_frame.grid(row=r, column=c, padx=4, pady=4, sticky="nsew")
+                grid_frame.grid_columnconfigure(c, weight=1)
 
-            btn_exec = ctk.CTkButton(
-                card_frame,
-                text=texto_exibicao,
-                image=img_obj,
-                compound="left",
-                height=38,
-                fg_color="transparent",
-                hover_color=("#CBD5E1", "#334155"),
-                text_color=COLOR_TEXT_PRIMARY,
-                font=("Segoe UI", 11, "bold"),
-                anchor="w",
-                command=lambda a=item['alvo']: self.abrir_inteligente(a),
-            )
-            btn_exec.pack(side="left", fill="both", expand=True, padx=(8, 0))
+                foto_icon = item.get("foto_icone", "")
+                img_obj = None
+                if foto_icon and os.path.exists(foto_icon):
+                    try:
+                        pil_img = Image.open(foto_icon)
+                        img_obj = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(20, 20))
+                    except Exception:
+                        img_obj = None
 
-            btn_up = ctk.CTkButton(
-                card_frame,
-                text="⬆️",
-                width=26,
-                height=26,
-                fg_color=("#CBD5E1", "#334155"),
-                text_color=COLOR_TEXT_PRIMARY,
-                command=lambda i=idx: self.mover_atalho_posicao(i, -1)
-            )
-            btn_up.pack(side="right", padx=2)
+                prefixo_icone = item.get("icone", "🎮")
+                texto_exibicao = f"{prefixo_icone} {item['nome']}" if not img_obj else f" {item['nome']}"
 
-            btn_down = ctk.CTkButton(
-                card_frame,
-                text="⬇️",
-                width=26,
-                height=26,
-                fg_color=("#CBD5E1", "#334155"),
-                text_color=COLOR_TEXT_PRIMARY,
-                command=lambda i=idx: self.mover_atalho_posicao(i, 1)
-            )
-            btn_down.pack(side="right", padx=2)
+                btn_exec = ctk.CTkButton(
+                    card_frame,
+                    text=texto_exibicao,
+                    image=img_obj,
+                    compound="left",
+                    height=38,
+                    fg_color="transparent",
+                    hover_color=("#CBD5E1", "#334155"),
+                    text_color=COLOR_TEXT_PRIMARY,
+                    font=("Segoe UI", 11, "bold"),
+                    anchor="w",
+                    command=lambda a=item['alvo']: self.abrir_inteligente(a),
+                )
+                btn_exec.pack(side="left", fill="both", expand=True, padx=(8, 0))
 
-            btn_del = ctk.CTkButton(
-                card_frame,
-                text="🗑️",
-                width=30,
-                height=26,
-                fg_color="#EF4444",
-                hover_color="#DC2626",
-                text_color="#FFFFFF",
-                command=lambda i=idx: self.remover_atalho_customizado(i),
-            )
-            btn_del.pack(side="right", padx=6)
+                btn_del = ctk.CTkButton(
+                    card_frame,
+                    text="🗑️",
+                    width=28,
+                    height=26,
+                    fg_color="#EF4444",
+                    hover_color="#DC2626",
+                    text_color="#FFFFFF",
+                    command=lambda i=idx: self.remover_atalho_customizado(i),
+                )
+                btn_del.pack(side="right", padx=6)
+
+        # Modo Lista Sequencial
+        else:
+            for idx, item in enumerate(lista):
+                card_frame = ctk.CTkFrame(
+                    self.container_custom_items,
+                    fg_color=COLOR_BG_CARD,
+                    border_color=COLOR_BORDER,
+                    border_width=1,
+                    corner_radius=8
+                )
+                card_frame.pack(fill="x", pady=3, padx=4)
+
+                foto_icon = item.get("foto_icone", "")
+                img_obj = None
+                if foto_icon and os.path.exists(foto_icon):
+                    try:
+                        pil_img = Image.open(foto_icon)
+                        img_obj = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(20, 20))
+                    except Exception:
+                        img_obj = None
+
+                prefixo_icone = item.get("icone", "🎮")
+                texto_exibicao = f"{prefixo_icone} {item['nome']}" if not img_obj else f" {item['nome']}"
+
+                btn_exec = ctk.CTkButton(
+                    card_frame,
+                    text=texto_exibicao,
+                    image=img_obj,
+                    compound="left",
+                    height=38,
+                    fg_color="transparent",
+                    hover_color=("#CBD5E1", "#334155"),
+                    text_color=COLOR_TEXT_PRIMARY,
+                    font=("Segoe UI", 11, "bold"),
+                    anchor="w",
+                    command=lambda a=item['alvo']: self.abrir_inteligente(a),
+                )
+                btn_exec.pack(side="left", fill="both", expand=True, padx=(8, 0))
+
+                btn_up = ctk.CTkButton(
+                    card_frame,
+                    text="⬆️",
+                    width=26,
+                    height=26,
+                    fg_color=COLOR_BG_SURFACE,
+                    text_color=COLOR_TEXT_PRIMARY,
+                    command=lambda i=idx: self.mover_atalho_posicao(i, -1)
+                )
+                btn_up.pack(side="right", padx=2)
+
+                btn_down = ctk.CTkButton(
+                    card_frame,
+                    text="⬇️",
+                    width=26,
+                    height=26,
+                    fg_color=COLOR_BG_SURFACE,
+                    text_color=COLOR_TEXT_PRIMARY,
+                    command=lambda i=idx: self.mover_atalho_posicao(i, 1)
+                )
+                btn_down.pack(side="right", padx=2)
+
+                btn_del = ctk.CTkButton(
+                    card_frame,
+                    text="🗑️",
+                    width=30,
+                    height=26,
+                    fg_color="#EF4444",
+                    hover_color="#DC2626",
+                    text_color="#FFFFFF",
+                    command=lambda i=idx: self.remover_atalho_customizado(i),
+                )
+                btn_del.pack(side="right", padx=6)
 
     # =========================================================================
     # ABA 2: INTEGRAÇÃO DA INTELIGÊNCIA ARTIFICIAL (CHAT)
@@ -865,7 +977,7 @@ class DashboardFrame(ctk.CTkFrame):
 
         self.entry_ia_prompt = ctk.CTkEntry(
             frame_input_ia,
-            placeholder_text="Digite sua pergunta ou mensagem...",
+            placeholder_text="Digite sua pergunta...",
             height=40,
             fg_color=COLOR_INPUT_BG,
             text_color=COLOR_TEXT_PRIMARY,
@@ -906,7 +1018,7 @@ class DashboardFrame(ctk.CTkFrame):
 
     def _processar_resposta_ia(self, mensagem):
         time.sleep(0.5)
-        resposta = f"Recebi sua mensagem: '{mensagem}'. Integração com IA pronta para ser expandida!"
+        resposta = f"Recebi sua mensagem: '{mensagem}'. Integração pronta para expansão!"
         self.after(0, lambda: self.adicionar_mensagem_chat("OmniAI", resposta))
 
     # =========================================================================
@@ -927,7 +1039,7 @@ class DashboardFrame(ctk.CTkFrame):
             text="📁 Abrir Vídeo",
             width=100,
             height=32,
-            fg_color=("#CBD5E1", "#334155"),
+            fg_color=COLOR_BG_SURFACE,
             text_color=COLOR_TEXT_PRIMARY,
             command=self.carregar_arquivo_video
         )
@@ -950,7 +1062,7 @@ class DashboardFrame(ctk.CTkFrame):
             text="⏸️ Pause",
             width=70,
             height=32,
-            fg_color=("#CBD5E1", "#334155"),
+            fg_color=COLOR_BG_SURFACE,
             text_color=COLOR_TEXT_PRIMARY,
             command=lambda: self.video_player.pause()
         )
@@ -978,12 +1090,89 @@ class DashboardFrame(ctk.CTkFrame):
             self.video_player.play()
 
     # =========================================================================
-    # ABA 4: CONFIGURAÇÕES E MONITOR DE RECURSOS DETALHADO
+    # ABA 4: CONFIGURAÇÕES, PLANO DE FUNDO & ORGANIZAÇÃO
     # =========================================================================
     def montar_aba_config(self):
         scroll_config = ctk.CTkScrollableFrame(self.tab_config, fg_color="transparent")
         scroll_config.pack(fill="both", expand=True, padx=4, pady=4)
 
+        # Seção de Plano de Fundo Customizado
+        frame_bg_config = ctk.CTkFrame(scroll_config, fg_color=COLOR_BG_CARD, corner_radius=10)
+        frame_bg_config.pack(fill="x", pady=8, padx=4)
+
+        ctk.CTkLabel(
+            frame_bg_config,
+            text="🖼️ Plano de Fundo da Tela",
+            font=("Segoe UI", 12, "bold"),
+            text_color=COLOR_TEXT_PRIMARY
+        ).pack(anchor="w", padx=12, pady=(10, 6))
+
+        frame_bg_botoes = ctk.CTkFrame(frame_bg_config, fg_color="transparent")
+        frame_bg_botoes.pack(fill="x", padx=12, pady=(4, 12))
+
+        btn_select_bg = ctk.CTkButton(
+            frame_bg_botoes,
+            text="Escolher Imagem de Fundo",
+            height=32,
+            fg_color="#2563EB",
+            hover_color="#1D4ED8",
+            text_color="#FFFFFF",
+            font=("Segoe UI", 10, "bold"),
+            command=self.selecionar_imagem_fundo
+        )
+        btn_select_bg.pack(side="left", padx=4)
+
+        btn_clear_bg = ctk.CTkButton(
+            frame_bg_botoes,
+            text="Remover Fundo",
+            height=32,
+            fg_color="#EF4444",
+            hover_color="#DC2626",
+            text_color="#FFFFFF",
+            font=("Segoe UI", 10, "bold"),
+            command=self.remover_imagem_fundo
+        )
+        btn_clear_bg.pack(side="left", padx=4)
+
+        # Seção de Modo de Organização
+        frame_org_config = ctk.CTkFrame(scroll_config, fg_color=COLOR_BG_CARD, corner_radius=10)
+        frame_org_config.pack(fill="x", pady=8, padx=4)
+
+        ctk.CTkLabel(
+            frame_org_config,
+            text="📐 Modo de Organização dos Atalhos",
+            font=("Segoe UI", 12, "bold"),
+            text_color=COLOR_TEXT_PRIMARY
+        ).pack(anchor="w", padx=12, pady=(10, 6))
+
+        frame_org_botoes = ctk.CTkFrame(frame_org_config, fg_color="transparent")
+        frame_org_botoes.pack(fill="x", padx=12, pady=(4, 12))
+
+        btn_modo_grid = ctk.CTkButton(
+            frame_org_botoes,
+            text="📱 Visão em Grade (Grid)",
+            height=32,
+            fg_color=COLOR_BG_SURFACE,
+            hover_color=("#CBD5E1", "#334155"),
+            text_color=COLOR_TEXT_PRIMARY,
+            font=("Segoe UI", 10, "bold"),
+            command=lambda: self.alterar_modo_layout("grid")
+        )
+        btn_modo_grid.pack(side="left", padx=4)
+
+        btn_modo_lista = ctk.CTkButton(
+            frame_org_botoes,
+            text="📋 Visão em Lista Sequencial",
+            height=32,
+            fg_color=COLOR_BG_SURFACE,
+            hover_color=("#CBD5E1", "#334155"),
+            text_color=COLOR_TEXT_PRIMARY,
+            font=("Segoe UI", 10, "bold"),
+            command=lambda: self.alterar_modo_layout("lista")
+        )
+        btn_modo_lista.pack(side="left", padx=4)
+
+        # Seção Hardware
         frame_hw_detalhado = ctk.CTkFrame(scroll_config, fg_color=COLOR_BG_CARD, corner_radius=10)
         frame_hw_detalhado.pack(fill="x", pady=8, padx=4)
 
@@ -1020,6 +1209,7 @@ class DashboardFrame(ctk.CTkFrame):
         self.lbl_ram_valor_detalhado = ctk.CTkLabel(frame_bar_ram, text="0%", font=("Segoe UI", 11, "bold"), text_color=COLOR_TEXT_PRIMARY, width=150)
         self.lbl_ram_valor_detalhado.pack(side="right")
 
+        # Seção Cores
         frame_cores = ctk.CTkFrame(scroll_config, fg_color=COLOR_BG_CARD, corner_radius=10)
         frame_cores.pack(fill="x", pady=8, padx=4)
 
@@ -1048,29 +1238,21 @@ class DashboardFrame(ctk.CTkFrame):
             )
             btn_c.pack(side="left", padx=4)
 
-    # =========================================================================
-    # FUNÇÕES AUXILIARES DE EXECUÇÃO E GRID
-    # =========================================================================
-    def criar_cards_grid(self, parent_scroll, lista_items):
-        frame_grid = ctk.CTkFrame(parent_scroll, fg_color="transparent")
-        frame_grid.pack(fill="x", pady=4)
+    def selecionar_imagem_fundo(self):
+        caminho = filedialog.askopenfilename(
+            title="Escolha uma Imagem para o Fundo da Tela",
+            filetypes=[("Imagens", "*.png *.jpg *.jpeg *.bmp")]
+        )
+        if caminho and self.controller.perfil_ativo:
+            self.controller.perfil_ativo["fundo_imagem"] = caminho
+            AccountManager.salvar_dados(self.controller.dados_config)
+            self.atualizar_fundo_tela(caminho)
 
-        for nome, alvo, cor in lista_items:
-            btn = ctk.CTkButton(
-                frame_grid,
-                text=nome,
-                height=40,
-                corner_radius=8,
-                fg_color=COLOR_BG_CARD,
-                hover_color=("#CBD5E1", "#334155"),
-                text_color=COLOR_TEXT_PRIMARY,
-                border_color=COLOR_BORDER,
-                border_width=1,
-                font=("Segoe UI", 11, "bold"),
-                anchor="w",
-                command=lambda a=alvo: self.abrir_inteligente(a)
-            )
-            btn.pack(fill="x", pady=3, padx=4)
+    def remover_imagem_fundo(self):
+        if self.controller.perfil_ativo:
+            self.controller.perfil_ativo["fundo_imagem"] = ""
+            AccountManager.salvar_dados(self.controller.dados_config)
+            self.atualizar_fundo_tela("")
 
     def selecionar_executavel_direto(self):
         caminho = filedialog.askopenfilename(
@@ -1104,7 +1286,7 @@ class DashboardFrame(ctk.CTkFrame):
 
 
 class OmniOverlayApp(ctk.CTk):
-    """Classe principal da Aplicação Gerenciadora de Telas e Estado Global."""
+    """Classe Principal da Aplicação."""
 
     def __init__(self):
         super().__init__()
@@ -1145,11 +1327,9 @@ class OmniOverlayApp(ctk.CTk):
         else:
             self.abrir_seletor_perfis()
 
-        # Inicia o ouvinte de atalho global para Alt + Z
         self.iniciar_hotkey_listener()
 
     def iniciar_hotkey_listener(self):
-        """Registra o atalho global Alt + Z em segundo plano."""
         def on_activate():
             self.after(0, self.toggle_visibilidade)
 
@@ -1160,7 +1340,6 @@ class OmniOverlayApp(ctk.CTk):
             print(f"[HOTKEY] Erro ao registrar o atalho Alt + Z: {e}")
 
     def toggle_visibilidade(self):
-        """Exibe ou oculta a janela do aplicativo ao pressionar a tecla de atalho."""
         if self.winfo_viewable():
             self.withdraw()
         else:

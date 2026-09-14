@@ -6,7 +6,9 @@
             "cor_acento": "azul",
             "gemini_key": "",
             "atalhos_custom": [],
-            "foto_perfil": ""
+            "foto_perfil": "",
+            "fundo_imagem": "",
+            "modo_layout": "grid"
         },
         {
             "id": "p_1788185983",
@@ -25,7 +27,9 @@
                     "foto_icone": ""
                 }
             ],
-            "foto_perfil": "C:/Users/Aluno/Downloads/ChatGPT Image 21_08_2026, 11_26_43.png"
+            "foto_perfil": "C:/Users/Aluno/Pictures/Vocação - Wallpaper PC.png",
+            "fundo_imagem": "C:/Users/Aluno/Pictures/Vocação - Wallpaper PC.png",
+            "modo_layout": "grid"
         },
         {
             "id": "p_1788186646",
@@ -33,7 +37,9 @@
             "cor_acento": "azul",
             "gemini_key": "",
             "atalhos_custom": [],
-            "foto_perfil": ""
+            "foto_perfil": "",
+            "fundo_imagem": "",
+            "modo_layout": "grid"
         },
         {
             "id": "p_1788350254",
@@ -41,7 +47,9 @@
             "cor_acento": "azul",
             "gemini_key": "",
             "atalhos_custom": [],
-            "foto_perfil": ""
+            "foto_perfil": "",
+            "fundo_imagem": "",
+            "modo_layout": "grid"
         }
     ],
     "ultimo_perfil": "p_1788185983",
