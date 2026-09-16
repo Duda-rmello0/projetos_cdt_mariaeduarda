@@ -1,6 +1,6 @@
 """
 ===============================================================================
-PROJETO: OmniOverlay - Dynamic Accent Colors & Full Theme Integration
+PROJETO: OmniOverlay - Dynamic Accent Colors, Full Theme & Profile Manager
 ===============================================================================
 """
 
@@ -132,7 +132,7 @@ class AccountManager:
 
 
 class ProfileSelectorFrame(ctk.CTkFrame):
-    """Tela de Seleção de Perfis."""
+    """Tela de Seleção de Perfis com Opção de Criar e Excluir."""
 
     def __init__(self, parent, controller):
         super().__init__(parent, fg_color=COLOR_BG_SURFACE, corner_radius=12)
@@ -258,6 +258,21 @@ class ProfileSelectorFrame(ctk.CTkFrame):
             )
             btn_entrar.pack(side="right", padx=12)
 
+            # Botão de excluir conta
+            btn_excluir = ctk.CTkButton(
+                card,
+                text="🗑️",
+                width=36,
+                height=32,
+                corner_radius=6,
+                fg_color="#EF4444",
+                hover_color="#DC2626",
+                text_color="#FFFFFF",
+                font=("Segoe UI", 12),
+                command=lambda p=perfil: self.acao_excluir_perfil(p),
+            )
+            btn_excluir.pack(side="right", padx=(0, 4))
+
     def acao_criar_perfil(self):
         nome = self.entry_novo_nome.get().strip()
         if not nome:
@@ -280,6 +295,17 @@ class ProfileSelectorFrame(ctk.CTkFrame):
         self.entry_novo_nome.delete(0, "end")
         self.controller.entrar_no_perfil(novo_perfil)
 
+    def acao_excluir_perfil(self, perfil):
+        perfis = self.controller.dados_config.get("perfis", [])
+        
+        # Impede excluir se houver apenas 1 perfil restante
+        if len(perfis) <= 1:
+            return
+
+        self.controller.dados_config["perfis"] = [p for p in perfis if p["id"] != perfil["id"]]
+        AccountManager.salvar_dados(self.controller.dados_config)
+        self.atualizar_lista()
+
 
 class DashboardFrame(ctk.CTkFrame):
     """Painel Principal Dashboard Overlay."""
@@ -292,7 +318,6 @@ class DashboardFrame(ctk.CTkFrame):
         self._offset_y = 0
         self.modo_cinema_ativo = False
         
-        # Listas para rastrear elementos que mudam com a Cor de Destaque
         self.dynamic_accent_buttons = []
         self.dynamic_accent_borders = []
         
@@ -307,7 +332,6 @@ class DashboardFrame(ctk.CTkFrame):
         self.lbl_fundo_bg.place(x=0, y=0, relwidth=1, relheight=1)
         self.lbl_fundo_bg.lower()
 
-        # Header Organizado
         self.header_frame = ctk.CTkFrame(
             self,
             fg_color=COLOR_BG_SURFACE,
@@ -321,7 +345,6 @@ class DashboardFrame(ctk.CTkFrame):
         self.header_frame.bind("<Button-1>", self.iniciar_arraste)
         self.header_frame.bind("<B1-Motion>", self.arrastar_janela)
 
-        # Avatar com borda/fundo dinâmico da cor de acento
         self.btn_avatar = ctk.CTkButton(
             self.header_frame,
             text="👤",
@@ -345,7 +368,6 @@ class DashboardFrame(ctk.CTkFrame):
         )
         self.lbl_titulo.pack(side="left", padx=2)
 
-        # Monitor de Hardware
         self.frame_hardware = ctk.CTkFrame(
             self.header_frame,
             fg_color=COLOR_BG_CARD,
@@ -372,7 +394,6 @@ class DashboardFrame(ctk.CTkFrame):
         )
         self.lbl_ram.pack(side="left", padx=(0, 8))
 
-        # Botões de Ação do Header
         btn_fechar = ctk.CTkButton(
             self.header_frame,
             text="✕",
@@ -428,7 +449,6 @@ class DashboardFrame(ctk.CTkFrame):
         )
         btn_trocar_conta.pack(side="right", padx=4)
 
-        # Barra de Pesquisa Rápida
         self.frame_busca = ctk.CTkFrame(
             self,
             fg_color=COLOR_BG_SURFACE,
@@ -476,7 +496,6 @@ class DashboardFrame(ctk.CTkFrame):
         btn_executar.pack(side="right", padx=8, pady=8)
         self.dynamic_accent_buttons.append(btn_executar)
 
-        # Abas Principais (Hub, IA, Player, Configurações) com bordas dinâmicas
         self.tabview = ctk.CTkTabview(
             self,
             corner_radius=12,
@@ -491,7 +510,7 @@ class DashboardFrame(ctk.CTkFrame):
             segmented_button_unselected_hover_color=COLOR_BORDER
         )
         self.tabview.pack(fill="both", expand=True, padx=16, pady=(8, 16))
-        self.dynamic_accent_buttons.append(self.tabview) # O segmented button interno segue o acento
+        self.dynamic_accent_buttons.append(self.tabview)
 
         self.tab_hub = self.tabview.add("🚀 Central de Atalhos")
         self.tab_ia = self.tabview.add("🤖 Assistente IA")
@@ -573,10 +592,8 @@ class DashboardFrame(ctk.CTkFrame):
             self.atualizar_foto_avatar(caminho)
 
     def aplicar_cor_acento(self, nome_cor):
-        """Propaga a cor selecionada para TODOS os botões, bordas e seleções da UI."""
         cor = COLOR_ACCENTS.get(nome_cor, COLOR_ACCENTS["azul"])
         
-        # 1. Atualiza botões comuns de destaque
         for item in self.dynamic_accent_buttons:
             try:
                 if isinstance(item, ctk.CTkButton):
@@ -586,14 +603,12 @@ class DashboardFrame(ctk.CTkFrame):
             except Exception:
                 pass
 
-        # 2. Atualiza bordas ou elementos que usam o destaque visual
         for frame_borda in self.dynamic_accent_borders:
             try:
                 frame_borda.configure(border_color=cor["primary"])
             except Exception:
                 pass
 
-        # 3. Salva no perfil ativo
         if self.controller.perfil_ativo:
             self.controller.perfil_ativo["cor_acento"] = nome_cor
             AccountManager.salvar_dados(self.controller.dados_config)
@@ -652,13 +667,10 @@ class DashboardFrame(ctk.CTkFrame):
         except Exception as e:
             print(f"[ERRO] Falha ao abrir alvo '{alvo}': {e}")
 
-    # =========================================================================
-    # ABA 1: CENTRAL DE ATALHOS & LAYOUTS CUSTOMIZÁVEIS
-    # =========================================================================
     def montar_aba_hub(self):
         frame_adicionar = ctk.CTkFrame(self.tab_hub, fg_color=COLOR_BG_CARD, corner_radius=10, border_color=COLOR_BORDER, border_width=1)
         frame_adicionar.pack(fill="x", pady=(8, 8), padx=8, ipady=4)
-        self.dynamic_accent_borders.append(frame_adicionar) # Adiciona à lista para receber borda colorida
+        self.dynamic_accent_borders.append(frame_adicionar)
 
         ctk.CTkLabel(
             frame_adicionar,
@@ -952,9 +964,6 @@ class DashboardFrame(ctk.CTkFrame):
                 )
                 btn_del.pack(side="right", padx=6, pady=6)
 
-    # =========================================================================
-    # ABA 2: ASSISTENTE IA INTEGRADO
-    # =========================================================================
     def montar_aba_ia(self):
         ia_container = ctk.CTkFrame(self.tab_ia, fg_color="transparent")
         ia_container.pack(fill="both", expand=True, padx=8, pady=8)
@@ -1030,9 +1039,6 @@ class DashboardFrame(ctk.CTkFrame):
         self.chat_historico.see("end")
         self.entry_chat.delete(0, "end")
 
-    # =========================================================================
-    # ABA 3: PLAYER DE VÍDEO EM OVERLAY
-    # =========================================================================
     def montar_aba_player_video(self):
         video_container = ctk.CTkFrame(self.tab_video, fg_color="transparent")
         video_container.pack(fill="both", expand=True, padx=8, pady=8)
@@ -1097,9 +1103,6 @@ class DashboardFrame(ctk.CTkFrame):
         except Exception:
             pass
 
-    # =========================================================================
-    # ABA 4: CONFIGURAÇÕES GERAIS DO SISTEMA
-    # =========================================================================
     def montar_aba_config(self):
         config_container = ctk.CTkScrollableFrame(self.tab_config, fg_color="transparent")
         config_container.pack(fill="both", expand=True, padx=4, pady=4)
@@ -1140,7 +1143,6 @@ class DashboardFrame(ctk.CTkFrame):
             )
             btn_cor.pack(side="left", padx=4)
 
-        # Configuração de Fundo Customizado
         ctk.CTkLabel(
             config_container,
             text="🖼️ Plano de Fundo Customizado",
@@ -1166,7 +1168,6 @@ class DashboardFrame(ctk.CTkFrame):
         btn_escolher_fundo.pack(anchor="w", padx=12, pady=10)
         self.dynamic_accent_buttons.append(btn_escolher_fundo)
 
-        # Monitor de Hardware Detalhado
         ctk.CTkLabel(
             config_container,
             text="📊 Monitoramento Detalhado de Hardware",
