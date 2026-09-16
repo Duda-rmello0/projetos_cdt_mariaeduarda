@@ -21,13 +21,16 @@ from pynput import keyboard
 
 CONFIG_FILE = "app_config.json"
 
-# Definições Universais de Cores (Claro / Escuro)
-COLOR_TEXT_PRIMARY = ("#0F172A", "#F8FAFC")
-COLOR_TEXT_SECONDARY = ("#475569", "#94A3B8")
-COLOR_BG_SURFACE = ("#F8FAFC", "#0F172A")
-COLOR_BG_CARD = ("#E2E8F0", "#1E293B")
-COLOR_INPUT_BG = ("#FFFFFF", "#1E293B")
-COLOR_BORDER = ("#CBD5E1", "#334155")
+# =====================================================================
+# CORREÇÃO DE CORES UNIVERSAIS (Modo Claro / Modo Escuro)
+# Formato do CustomTkinter: (Modo Claro, Modo Escuro)
+# =====================================================================
+COLOR_TEXT_PRIMARY = ("#0F172A", "#F8FAFC")     # Preto/Escuro no Light, Branco no Dark
+COLOR_TEXT_SECONDARY = ("#475569", "#94A3B8")   # Cinza escuro no Light, Cinza claro no Dark
+COLOR_BG_SURFACE = ("#F1F5F9", "#0F172A")       # Fundo geral da janela
+COLOR_BG_CARD = ("#FFFFFF", "#1E293B")          # Fundo dos cards (Branco no Light, Escuro no Dark)
+COLOR_INPUT_BG = ("#FFFFFF", "#1E293B")         # Fundo das caixas de texto
+COLOR_BORDER = ("#CBD5E1", "#334155")           # Bordas
 
 COLOR_ACCENTS = {
     "azul": {"primary": "#2563EB", "hover": "#1D4ED8"},
@@ -164,7 +167,7 @@ class ProfileSelectorFrame(ctk.CTkFrame):
         self.scroll_perfis = ctk.CTkScrollableFrame(self, fg_color="transparent")
         self.scroll_perfis.pack(fill="both", expand=True, padx=20, pady=15)
 
-        frame_criar = ctk.CTkFrame(self, fg_color=COLOR_BG_CARD, corner_radius=12)
+        frame_criar = ctk.CTkFrame(self, fg_color=COLOR_BG_CARD, corner_radius=12, border_color=COLOR_BORDER, border_width=1)
         frame_criar.pack(fill="x", padx=20, pady=(0, 20))
 
         ctk.CTkLabel(
@@ -205,7 +208,7 @@ class ProfileSelectorFrame(ctk.CTkFrame):
         perfis = self.controller.dados_config.get("perfis", [])
 
         for perfil in perfis:
-            card = ctk.CTkFrame(self.scroll_perfis, fg_color=COLOR_BG_CARD, corner_radius=12)
+            card = ctk.CTkFrame(self.scroll_perfis, fg_color=COLOR_BG_CARD, corner_radius=12, border_color=COLOR_BORDER, border_width=1)
             card.pack(fill="x", pady=6, ipady=4)
 
             foto_path = perfil.get("foto_perfil", "")
@@ -342,6 +345,8 @@ class DashboardFrame(ctk.CTkFrame):
             self.header_frame,
             fg_color=COLOR_BG_CARD,
             corner_radius=8,
+            border_color=COLOR_BORDER,
+            border_width=1,
             height=36
         )
         self.frame_hardware.pack(side="left", padx=16, pady=10)
@@ -350,7 +355,7 @@ class DashboardFrame(ctk.CTkFrame):
             self.frame_hardware,
             text="⚡ CPU: 0%",
             font=("Segoe UI", 10, "bold"),
-            text_color=("#1D4ED8", "#60A5FA")
+            text_color=COLOR_TEXT_PRIMARY
         )
         self.lbl_cpu.pack(side="left", padx=8)
 
@@ -358,7 +363,7 @@ class DashboardFrame(ctk.CTkFrame):
             self.frame_hardware,
             text="💾 RAM: 0%",
             font=("Segoe UI", 10, "bold"),
-            text_color=("#15803D", "#4ADE80")
+            text_color=COLOR_TEXT_PRIMARY
         )
         self.lbl_ram.pack(side="left", padx=(0, 8))
 
@@ -383,7 +388,7 @@ class DashboardFrame(ctk.CTkFrame):
             height=32,
             corner_radius=8,
             fg_color=COLOR_BG_CARD,
-            hover_color=("#CBD5E1", "#334155"),
+            hover_color=COLOR_BORDER,
             text_color=COLOR_TEXT_PRIMARY,
             font=("Segoe UI", 12),
             command=self.controller.alternar_tema_global,
@@ -411,7 +416,7 @@ class DashboardFrame(ctk.CTkFrame):
             height=32,
             corner_radius=8,
             fg_color=COLOR_BG_CARD,
-            hover_color=("#CBD5E1", "#334155"),
+            hover_color=COLOR_BORDER,
             text_color=COLOR_TEXT_PRIMARY,
             font=("Segoe UI", 10, "bold"),
             command=self.controller.abrir_seletor_perfis,
@@ -447,7 +452,7 @@ class DashboardFrame(ctk.CTkFrame):
             width=100,
             height=38,
             fg_color=COLOR_BG_CARD,
-            hover_color=("#CBD5E1", "#334155"),
+            hover_color=COLOR_BORDER,
             text_color=COLOR_TEXT_PRIMARY,
             command=self.selecionar_executavel_direto,
         )
@@ -474,6 +479,11 @@ class DashboardFrame(ctk.CTkFrame):
             border_color=COLOR_BORDER,
             border_width=1,
             text_color=COLOR_TEXT_PRIMARY,
+            segmented_button_fg_color=COLOR_BG_CARD,
+            segmented_button_selected_color="#2563EB",
+            segmented_button_selected_hover_color="#1D4ED8",
+            segmented_button_unselected_color=COLOR_BG_CARD,
+            segmented_button_unselected_hover_color=COLOR_BORDER
         )
         self.tabview.pack(fill="both", expand=True, padx=16, pady=(8, 16))
 
@@ -623,7 +633,7 @@ class DashboardFrame(ctk.CTkFrame):
     # ABA 1: CENTRAL DE ATALHOS & LAYOUTS CUSTOMIZÁVEIS
     # =========================================================================
     def montar_aba_hub(self):
-        frame_adicionar = ctk.CTkFrame(self.tab_hub, fg_color=COLOR_BG_CARD, corner_radius=10)
+        frame_adicionar = ctk.CTkFrame(self.tab_hub, fg_color=COLOR_BG_CARD, corner_radius=10, border_color=COLOR_BORDER, border_width=1)
         frame_adicionar.pack(fill="x", pady=(8, 8), padx=8, ipady=4)
 
         ctk.CTkLabel(
@@ -662,6 +672,7 @@ class DashboardFrame(ctk.CTkFrame):
             width=100,
             height=32,
             fg_color=COLOR_BG_SURFACE,
+            hover_color=COLOR_BORDER,
             text_color=COLOR_TEXT_PRIMARY,
             command=self.procurar_app_para_atalho,
         )
@@ -691,6 +702,7 @@ class DashboardFrame(ctk.CTkFrame):
             width=110,
             height=30,
             fg_color=COLOR_BG_SURFACE,
+            hover_color=COLOR_BORDER,
             text_color=COLOR_TEXT_PRIMARY,
             command=self.escolher_foto_icone_atalho,
         )
@@ -713,7 +725,12 @@ class DashboardFrame(ctk.CTkFrame):
             self.tab_hub,
             corner_radius=10,
             fg_color="transparent",
-            text_color=COLOR_TEXT_PRIMARY
+            text_color=COLOR_TEXT_PRIMARY,
+            segmented_button_fg_color=COLOR_BG_CARD,
+            segmented_button_selected_color="#2563EB",
+            segmented_button_selected_hover_color="#1D4ED8",
+            segmented_button_unselected_color=COLOR_BG_CARD,
+            segmented_button_unselected_hover_color=COLOR_BORDER
         )
         self.tabview_hub.pack(fill="both", expand=True, padx=4, pady=0)
 
@@ -768,7 +785,7 @@ class DashboardFrame(ctk.CTkFrame):
                 height=38,
                 corner_radius=8,
                 fg_color=COLOR_BG_CARD,
-                hover_color=("#CBD5E1", "#334155"),
+                hover_color=COLOR_BORDER,
                 text_color=COLOR_TEXT_PRIMARY,
                 border_color=COLOR_BORDER,
                 border_width=1,
@@ -890,7 +907,7 @@ class DashboardFrame(ctk.CTkFrame):
                     compound="left",
                     height=38,
                     fg_color="transparent",
-                    hover_color=("#CBD5E1", "#334155"),
+                    hover_color=COLOR_BORDER,
                     text_color=COLOR_TEXT_PRIMARY,
                     font=("Segoe UI", 11, "bold"),
                     anchor="w",
@@ -973,7 +990,6 @@ class DashboardFrame(ctk.CTkFrame):
         self.chat_historico.configure(state="normal")
         self.chat_historico.insert("end", f"Você: {texto}\n")
         
-        # Resposta inteligente baseada no input do usuário
         txt_lower = texto.lower()
         if "jogo" in txt_lower or "jogar" in txt_lower:
             resposta = "OmniAI: Para jogos, verifique a aba 'Central de Atalhos' na categoria de Jogos ou adicione seu executável favorito para acesso rápido!"
@@ -1006,7 +1022,7 @@ class DashboardFrame(ctk.CTkFrame):
         self.videoplayer = TkinterVideo(video_container, scaled=True, background="#0F172A")
         self.videoplayer.pack(fill="both", expand=True, pady=(0, 8))
 
-        controles_video = ctk.CTkFrame(video_container, fg_color=COLOR_BG_CARD, corner_radius=10)
+        controles_video = ctk.CTkFrame(video_container, fg_color=COLOR_BG_CARD, corner_radius=10, border_color=COLOR_BORDER, border_width=1)
         controles_video.pack(fill="x", pady=4)
 
         btn_escolher_video = ctk.CTkButton(
@@ -1028,6 +1044,7 @@ class DashboardFrame(ctk.CTkFrame):
             width=110,
             height=32,
             fg_color=COLOR_BG_SURFACE,
+            hover_color=COLOR_BORDER,
             text_color=COLOR_TEXT_PRIMARY,
             command=self.toggle_play_video
         )
@@ -1068,10 +1085,15 @@ class DashboardFrame(ctk.CTkFrame):
             text_color=COLOR_TEXT_PRIMARY
         ).pack(anchor="w", padx=8, pady=(4, 8))
 
-        frame_cores = ctk.CTkFrame(config_container, fg_color=COLOR_BG_CARD, corner_radius=10)
+        frame_cores = ctk.CTkFrame(config_container, fg_color=COLOR_BG_CARD, corner_radius=10, border_color=COLOR_BORDER, border_width=1)
         frame_cores.pack(fill="x", padx=4, pady=4, ipady=4)
 
-        ctk.CTkLabel(frame_cores, text="Cor de Destaque do Sistema:", font=("Segoe UI", 11), text_color=COLOR_TEXT_PRIMARY).pack(anchor="w", padx=12, pady=(8, 4))
+        ctk.CTkLabel(
+            frame_cores,
+            text="Cor de Destaque do Sistema:",
+            font=("Segoe UI", 11),
+            text_color=COLOR_TEXT_PRIMARY
+        ).pack(anchor="w", padx=12, pady=(8, 4))
 
         botoes_cores_frame = ctk.CTkFrame(frame_cores, fg_color="transparent")
         botoes_cores_frame.pack(anchor="w", padx=12, pady=(0, 10))
@@ -1099,7 +1121,7 @@ class DashboardFrame(ctk.CTkFrame):
             text_color=COLOR_TEXT_PRIMARY
         ).pack(anchor="w", padx=8, pady=(16, 8))
 
-        frame_fundo = ctk.CTkFrame(config_container, fg_color=COLOR_BG_CARD, corner_radius=10)
+        frame_fundo = ctk.CTkFrame(config_container, fg_color=COLOR_BG_CARD, corner_radius=10, border_color=COLOR_BORDER, border_width=1)
         frame_fundo.pack(fill="x", padx=4, pady=4, ipady=4)
 
         btn_escolher_fundo = ctk.CTkButton(
@@ -1124,23 +1146,45 @@ class DashboardFrame(ctk.CTkFrame):
             text_color=COLOR_TEXT_PRIMARY
         ).pack(anchor="w", padx=8, pady=(16, 8))
 
-        frame_hw_detalhado = ctk.CTkFrame(config_container, fg_color=COLOR_BG_CARD, corner_radius=10)
+        frame_hw_detalhado = ctk.CTkFrame(config_container, fg_color=COLOR_BG_CARD, corner_radius=10, border_color=COLOR_BORDER, border_width=1)
         frame_hw_detalhado.pack(fill="x", padx=4, pady=4, ipady=8)
 
-        ctk.CTkLabel(frame_hw_detalhado, text="Uso da CPU:", font=("Segoe UI", 10, "bold"), text_color=COLOR_TEXT_PRIMARY).pack(anchor="w", padx=12, pady=(6, 0))
+        ctk.CTkLabel(
+            frame_hw_detalhado,
+            text="Uso da CPU:",
+            font=("Segoe UI", 10, "bold"),
+            text_color=COLOR_TEXT_PRIMARY
+        ).pack(anchor="w", padx=12, pady=(6, 0))
+        
         self.bar_cpu_detalhada = ctk.CTkProgressBar(frame_hw_detalhado, height=12)
         self.bar_cpu_detalhada.pack(fill="x", padx=12, pady=2)
         self.bar_cpu_detalhada.set(0)
 
-        self.lbl_cpu_valor_detalhado = ctk.CTkLabel(frame_hw_detalhado, text="0.0%", font=("Segoe UI", 10), text_color=COLOR_TEXT_PRIMARY)
+        self.lbl_cpu_valor_detalhado = ctk.CTkLabel(
+            frame_hw_detalhado,
+            text="0.0%",
+            font=("Segoe UI", 10),
+            text_color=COLOR_TEXT_PRIMARY
+        )
         self.lbl_cpu_valor_detalhado.pack(anchor="e", padx=12)
 
-        ctk.CTkLabel(frame_hw_detalhado, text="Uso da Memória RAM:", font=("Segoe UI", 10, "bold"), text_color=COLOR_TEXT_PRIMARY).pack(anchor="w", padx=12, pady=(6, 0))
+        ctk.CTkLabel(
+            frame_hw_detalhado,
+            text="Uso da Memória RAM:",
+            font=("Segoe UI", 10, "bold"),
+            text_color=COLOR_TEXT_PRIMARY
+        ).pack(anchor="w", padx=12, pady=(6, 0))
+        
         self.bar_ram_detalhada = ctk.CTkProgressBar(frame_hw_detalhado, height=12)
         self.bar_ram_detalhada.pack(fill="x", padx=12, pady=2)
         self.bar_ram_detalhada.set(0)
 
-        self.lbl_ram_valor_detalhado = ctk.CTkLabel(frame_hw_detalhado, text="0.0%", font=("Segoe UI", 10), text_color=COLOR_TEXT_PRIMARY)
+        self.lbl_ram_valor_detalhado = ctk.CTkLabel(
+            frame_hw_detalhado,
+            text="0.0%",
+            font=("Segoe UI", 10),
+            text_color=COLOR_TEXT_PRIMARY
+        )
         self.lbl_ram_valor_detalhado.pack(anchor="e", padx=12)
 
     def selecionar_fundo_customizado(self):
@@ -1228,6 +1272,7 @@ class OmniOverlayApp(ctk.CTk):
         self.profile_frame.atualizar_lista()
 
     def alternar_tema_global(self):
+        # Alterna o modo
         if self.modo_tema_atual == "dark":
             self.modo_tema_atual = "light"
         else:
@@ -1236,11 +1281,14 @@ class OmniOverlayApp(ctk.CTk):
         ctk.set_appearance_mode(self.modo_tema_atual)
         self.dados_config["modo_tema"] = self.modo_tema_atual
         AccountManager.salvar_dados(self.dados_config)
+
+        # Destroi a tela atual do dashboard e reconstrói limpa para aplicar cores novas instantaneamente
+        self.dashboard_frame.destroy()
+        self.dashboard_frame = DashboardFrame(self.container, self)
         
-        if hasattr(self.dashboard_frame, "btn_tema"):
-            self.dashboard_frame.btn_tema.configure(
-                text="☀️" if self.modo_tema_atual == "dark" else "🌙"
-            )
+        if self.perfil_ativo:
+            self.dashboard_frame.pack(fill="both", expand=True)
+            self.dashboard_frame.carregar_perfil(self.perfil_ativo)
 
 
 if __name__ == "__main__":
