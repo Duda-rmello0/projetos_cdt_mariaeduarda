@@ -13,18 +13,12 @@
         {
             "id": "p_1788185983",
             "nome": "gustavo",
-            "cor_acento": "azul",
+            "cor_acento": "roxo",
             "gemini_key": "Legal",
             "atalhos_custom": [
                 {
                     "nome": "Roblox",
                     "alvo": "https://www.roblox.com/"
-                },
-                {
-                    "nome": "Visual studio code",
-                    "alvo": "C:/Users/Aluno/Desktop/desktop_dos_jovens/Visual Studio Code.lnk",
-                    "icone": "💻",
-                    "foto_icone": ""
                 }
             ],
             "foto_perfil": "C:/Users/Aluno/Pictures/Vocação - Wallpaper PC.png",
@@ -34,11 +28,11 @@
         {
             "id": "p_1788186646",
             "nome": "Maria",
-            "cor_acento": "azul",
+            "cor_acento": "roxo",
             "gemini_key": "",
             "atalhos_custom": [],
-            "foto_perfil": "",
-            "fundo_imagem": "",
+            "foto_perfil": "C:/Users/Aluno/Desktop/logotipo voacao.png",
+            "fundo_imagem": "C:/Users/Aluno/Desktop/logotipo voacao.png",
             "modo_layout": "grid"
         },
         {
@@ -61,6 +55,6 @@
             "atalhos_custom": []
         }
     ],
-    "ultimo_perfil": "p_1788185983",
+    "ultimo_perfil": "p_1788186646",
     "modo_tema": "dark"
 }
