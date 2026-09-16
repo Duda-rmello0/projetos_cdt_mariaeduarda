@@ -1,6 +1,6 @@
 """
 ===============================================================================
-PROJETO: OmniOverlay - Theme Engine, Custom Backgrounds & Flexible Layouts
+PROJETO: OmniOverlay - Dynamic Accent Colors & Full Theme Integration
 ===============================================================================
 """
 
@@ -22,16 +22,16 @@ from pynput import keyboard
 CONFIG_FILE = "app_config.json"
 
 # =====================================================================
-# CORREÇÃO DE CORES UNIVERSAIS (Modo Claro / Modo Escuro)
-# Formato do CustomTkinter: (Modo Claro, Modo Escuro)
+# CORES UNIVERSAIS E CONFIGURAÇÃO DE ACENTOS
 # =====================================================================
-COLOR_TEXT_PRIMARY = ("#0F172A", "#F8FAFC")     # Preto/Escuro no Light, Branco no Dark
-COLOR_TEXT_SECONDARY = ("#475569", "#94A3B8")   # Cinza escuro no Light, Cinza claro no Dark
-COLOR_BG_SURFACE = ("#F1F5F9", "#0F172A")       # Fundo geral da janela
-COLOR_BG_CARD = ("#FFFFFF", "#1E293B")          # Fundo dos cards (Branco no Light, Escuro no Dark)
-COLOR_INPUT_BG = ("#FFFFFF", "#1E293B")         # Fundo das caixas de texto
-COLOR_BORDER = ("#CBD5E1", "#334155")           # Bordas
+COLOR_TEXT_PRIMARY = ("#0F172A", "#F8FAFC")     
+COLOR_TEXT_SECONDARY = ("#475569", "#94A3B8")   
+COLOR_BG_SURFACE = ("#F1F5F9", "#0F172A")       
+COLOR_BG_CARD = ("#FFFFFF", "#1E293B")          
+COLOR_INPUT_BG = ("#FFFFFF", "#1E293B")         
+COLOR_BORDER = ("#CBD5E1", "#334155")           
 
+# Paleta completa de acentos (Cor Primária + Cor de Hover)
 COLOR_ACCENTS = {
     "azul": {"primary": "#2563EB", "hover": "#1D4ED8"},
     "vermelho": {"primary": "#DC2626", "hover": "#B91C1C"},
@@ -41,7 +41,7 @@ COLOR_ACCENTS = {
 
 
 class GlobalHotkeyManager:
-    """Gerencia o atalho global Alt + Z rastreando o estado das teclas com pynput."""
+    """Gerencia o atalho global Alt + Z."""
     def __init__(self, app_controller):
         self.controller = app_controller
         self.listener = None
@@ -65,7 +65,6 @@ class GlobalHotkeyManager:
     def ao_pressionar(self, key):
         try:
             self.teclas_pressionadas.add(key)
-            
             tem_alt = any(k in self.teclas_pressionadas for k in self.alt_keys)
             tem_z = (self.z_key in self.teclas_pressionadas) or (self.z_key_caps in self.teclas_pressionadas)
 
@@ -292,7 +291,11 @@ class DashboardFrame(ctk.CTkFrame):
         self._offset_x = 0
         self._offset_y = 0
         self.modo_cinema_ativo = False
+        
+        # Listas para rastrear elementos que mudam com a Cor de Destaque
         self.dynamic_accent_buttons = []
+        self.dynamic_accent_borders = []
+        
         self.icone_foto_temp = ""
         self.lbl_fundo_bg = None
 
@@ -318,6 +321,7 @@ class DashboardFrame(ctk.CTkFrame):
         self.header_frame.bind("<Button-1>", self.iniciar_arraste)
         self.header_frame.bind("<B1-Motion>", self.arrastar_janela)
 
+        # Avatar com borda/fundo dinâmico da cor de acento
         self.btn_avatar = ctk.CTkButton(
             self.header_frame,
             text="👤",
@@ -331,6 +335,7 @@ class DashboardFrame(ctk.CTkFrame):
             command=self.trocar_foto_perfil,
         )
         self.btn_avatar.pack(side="left", padx=(12, 8))
+        self.dynamic_accent_buttons.append(self.btn_avatar)
 
         self.lbl_titulo = ctk.CTkLabel(
             self.header_frame,
@@ -471,7 +476,7 @@ class DashboardFrame(ctk.CTkFrame):
         btn_executar.pack(side="right", padx=8, pady=8)
         self.dynamic_accent_buttons.append(btn_executar)
 
-        # Abas Principais (Hub, IA, Player, Configurações)
+        # Abas Principais (Hub, IA, Player, Configurações) com bordas dinâmicas
         self.tabview = ctk.CTkTabview(
             self,
             corner_radius=12,
@@ -486,6 +491,7 @@ class DashboardFrame(ctk.CTkFrame):
             segmented_button_unselected_hover_color=COLOR_BORDER
         )
         self.tabview.pack(fill="both", expand=True, padx=16, pady=(8, 16))
+        self.dynamic_accent_buttons.append(self.tabview) # O segmented button interno segue o acento
 
         self.tab_hub = self.tabview.add("🚀 Central de Atalhos")
         self.tab_ia = self.tabview.add("🤖 Assistente IA")
@@ -567,10 +573,27 @@ class DashboardFrame(ctk.CTkFrame):
             self.atualizar_foto_avatar(caminho)
 
     def aplicar_cor_acento(self, nome_cor):
+        """Propaga a cor selecionada para TODOS os botões, bordas e seleções da UI."""
         cor = COLOR_ACCENTS.get(nome_cor, COLOR_ACCENTS["azul"])
-        for btn in self.dynamic_accent_buttons:
-            btn.configure(fg_color=cor["primary"], hover_color=cor["hover"])
+        
+        # 1. Atualiza botões comuns de destaque
+        for item in self.dynamic_accent_buttons:
+            try:
+                if isinstance(item, ctk.CTkButton):
+                    item.configure(fg_color=cor["primary"], hover_color=cor["hover"])
+                elif isinstance(item, ctk.CTkTabview):
+                    item.configure(segmented_button_selected_color=cor["primary"], segmented_button_selected_hover_color=cor["hover"])
+            except Exception:
+                pass
 
+        # 2. Atualiza bordas ou elementos que usam o destaque visual
+        for frame_borda in self.dynamic_accent_borders:
+            try:
+                frame_borda.configure(border_color=cor["primary"])
+            except Exception:
+                pass
+
+        # 3. Salva no perfil ativo
         if self.controller.perfil_ativo:
             self.controller.perfil_ativo["cor_acento"] = nome_cor
             AccountManager.salvar_dados(self.controller.dados_config)
@@ -635,6 +658,7 @@ class DashboardFrame(ctk.CTkFrame):
     def montar_aba_hub(self):
         frame_adicionar = ctk.CTkFrame(self.tab_hub, fg_color=COLOR_BG_CARD, corner_radius=10, border_color=COLOR_BORDER, border_width=1)
         frame_adicionar.pack(fill="x", pady=(8, 8), padx=8, ipady=4)
+        self.dynamic_accent_borders.append(frame_adicionar) # Adiciona à lista para receber borda colorida
 
         ctk.CTkLabel(
             frame_adicionar,
@@ -733,6 +757,7 @@ class DashboardFrame(ctk.CTkFrame):
             segmented_button_unselected_hover_color=COLOR_BORDER
         )
         self.tabview_hub.pack(fill="both", expand=True, padx=4, pady=0)
+        self.dynamic_accent_buttons.append(self.tabview_hub)
 
         self.cat_custom = self.tabview_hub.add("⭐ Meus Atalhos")
         self.cat_media = self.tabview_hub.add("🎵 Mídia & Streaming")
@@ -1024,6 +1049,7 @@ class DashboardFrame(ctk.CTkFrame):
 
         controles_video = ctk.CTkFrame(video_container, fg_color=COLOR_BG_CARD, corner_radius=10, border_color=COLOR_BORDER, border_width=1)
         controles_video.pack(fill="x", pady=4)
+        self.dynamic_accent_borders.append(controles_video)
 
         btn_escolher_video = ctk.CTkButton(
             controles_video,
@@ -1087,6 +1113,7 @@ class DashboardFrame(ctk.CTkFrame):
 
         frame_cores = ctk.CTkFrame(config_container, fg_color=COLOR_BG_CARD, corner_radius=10, border_color=COLOR_BORDER, border_width=1)
         frame_cores.pack(fill="x", padx=4, pady=4, ipady=4)
+        self.dynamic_accent_borders.append(frame_cores)
 
         ctk.CTkLabel(
             frame_cores,
@@ -1123,6 +1150,7 @@ class DashboardFrame(ctk.CTkFrame):
 
         frame_fundo = ctk.CTkFrame(config_container, fg_color=COLOR_BG_CARD, corner_radius=10, border_color=COLOR_BORDER, border_width=1)
         frame_fundo.pack(fill="x", padx=4, pady=4, ipady=4)
+        self.dynamic_accent_borders.append(frame_fundo)
 
         btn_escolher_fundo = ctk.CTkButton(
             frame_fundo,
@@ -1148,6 +1176,7 @@ class DashboardFrame(ctk.CTkFrame):
 
         frame_hw_detalhado = ctk.CTkFrame(config_container, fg_color=COLOR_BG_CARD, corner_radius=10, border_color=COLOR_BORDER, border_width=1)
         frame_hw_detalhado.pack(fill="x", padx=4, pady=4, ipady=8)
+        self.dynamic_accent_borders.append(frame_hw_detalhado)
 
         ctk.CTkLabel(
             frame_hw_detalhado,
@@ -1222,7 +1251,6 @@ class OmniOverlayApp(ctk.CTk):
         self.profile_frame = ProfileSelectorFrame(self.container, self)
         self.dashboard_frame = DashboardFrame(self.container, self)
 
-        # Inicia o gerenciador do atalho global Alt + Z
         self.hotkey_manager = GlobalHotkeyManager(self)
         self.hotkey_manager.iniciar()
 
@@ -1237,7 +1265,6 @@ class OmniOverlayApp(ctk.CTk):
         self.geometry(f"{largura}x{altura}+{x}+{y}")
 
     def alternar_visibilidade_overlay(self):
-        """Esconde ou exibe a aplicação ao pressionar Alt + Z."""
         if self.state() == "withdrawn":
             self.deiconify()
             self.focus_force()
@@ -1272,7 +1299,6 @@ class OmniOverlayApp(ctk.CTk):
         self.profile_frame.atualizar_lista()
 
     def alternar_tema_global(self):
-        # Alterna o modo
         if self.modo_tema_atual == "dark":
             self.modo_tema_atual = "light"
         else:
@@ -1282,7 +1308,6 @@ class OmniOverlayApp(ctk.CTk):
         self.dados_config["modo_tema"] = self.modo_tema_atual
         AccountManager.salvar_dados(self.dados_config)
 
-        # Destroi a tela atual do dashboard e reconstrói limpa para aplicar cores novas instantaneamente
         self.dashboard_frame.destroy()
         self.dashboard_frame = DashboardFrame(self.container, self)
         
