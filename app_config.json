@@ -56,8 +56,17 @@
             "foto_perfil": "",
             "fundo_imagem": "",
             "modo_layout": "grid"
+        },
+        {
+            "id": "p_1789740029",
+            "nome": "Ivan Silva",
+            "cor_acento": "azul",
+            "foto_perfil": "",
+            "fundo_imagem": "",
+            "modo_layout": "grid",
+            "atalhos_custom": []
         }
     ],
-    "ultimo_perfil": "p1",
+    "ultimo_perfil": "p_1789740029",
     "modo_tema": "dark"
 }
