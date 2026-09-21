@@ -1,6 +1,6 @@
 # 🛡️ OmniOverlay
 
-**OmniOverlay** é uma aplicação desktop multifuncional desenvolvida em Python para oferecer uma interface de overlay customizável, acesso rápido a atalhos, player de vídeo, assistente virtual e monitoramento de hardware em tempo real.
+**OmniOverlay** OmniOverlay é uma aplicação desktop moderna desenvolvida em Python com CustomTkinter, projetada para funcionar como um painel flutuante (overlay) completo. Ela oferece gerenciamento de perfis, atalhos customizados inteligentes, monitoramento de hardware em tempo real, assistente de IA integrada, player de vídeo e personalização visual avançada.
 
 ---
 
