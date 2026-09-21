@@ -1477,7 +1477,7 @@ class DashboardFrame(ctk.CTkFrame):
                 pil_img = Image.open(caminho_img)
                 pil_img = pil_img.resize((920, 800), Image.Resampling.LANCZOS)
                 
-                # Salvamos a referência para evitar que o Garbage Collector apague a imagem
+                # Criação correta do objeto CTkImage para evitar avisos e renderizar na tela
                 self.imagem_fundo_atual = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(920, 800))
                 
                 self.lbl_fundo_bg.configure(image=self.imagem_fundo_atual, text="")
