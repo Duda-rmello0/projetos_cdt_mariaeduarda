@@ -8,7 +8,8 @@
             "atalhos_custom": [],
             "foto_perfil": "C:/Users/Aluno/Pictures/Vocação - Wallpaper PC.png",
             "fundo_imagem": "",
-            "modo_layout": "grid"
+            "modo_layout": "grid",
+            "cor_fundo": "#0F172A"
         },
         {
             "id": "p_1788185983",
@@ -35,7 +36,8 @@
             ],
             "foto_perfil": "C:/Users/Aluno/Pictures/Vocação - Wallpaper PC.png",
             "fundo_imagem": "C:/Users/Aluno/Pictures/Vocação - Wallpaper PC.png",
-            "modo_layout": "grid"
+            "modo_layout": "grid",
+            "cor_fundo": "#0F172A"
         },
         {
             "id": "p_1788186646",
@@ -45,7 +47,8 @@
             "atalhos_custom": [],
             "foto_perfil": "",
             "fundo_imagem": "",
-            "modo_layout": "grid"
+            "modo_layout": "grid",
+            "cor_fundo": "#0F172A"
         },
         {
             "id": "p_1788350254",
@@ -55,7 +58,8 @@
             "atalhos_custom": [],
             "foto_perfil": "",
             "fundo_imagem": "",
-            "modo_layout": "grid"
+            "modo_layout": "grid",
+            "cor_fundo": "#0F172A"
         },
         {
             "id": "p_1789740029",
@@ -64,9 +68,10 @@
             "foto_perfil": "",
             "fundo_imagem": "",
             "modo_layout": "grid",
-            "atalhos_custom": []
+            "atalhos_custom": [],
+            "cor_fundo": "#0F172A"
         }
     ],
-    "ultimo_perfil": "p_1789740029",
+    "ultimo_perfil": "p_1788185983",
     "modo_tema": "dark"
 }

@@ -1023,6 +1023,7 @@ class DashboardFrame(ctk.CTkFrame):
             ("🚀 Steam", "steam://open/main"),
             ("🛡️ Epic Games", "epicgames://"),
             ("💬 Discord", "https://discord.com/app"),
+            ("💻 Discord App", "discord://"),
             ("🎮 Roblox", "https://www.roblox.com"),
             ("🔴 Roblox App", "roblox://"),
             ("🌐 Poki Jogos", "https://poki.com"),

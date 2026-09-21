@@ -1,6 +1,6 @@
 """
 ===============================================================================
-PROJETO: OmniOverlay - Dynamic Accent Colors, Full Theme & Profile Manager
+PROJETO: OmniOverlay - Dynamic Accent Colors, Full Theme, Profile & Root Master
 ===============================================================================
 """
 
@@ -11,27 +11,25 @@ import time
 import urllib.parse
 import webbrowser
 import threading
+import sqlite3
 import customtkinter as ctk
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 from PIL import Image, ImageTk
-from tkVideoPlayer import TkinterVideo
+import cv2
 
 import psutil
 from pynput import keyboard
 
 CONFIG_FILE = "app_config.json"
+DB_FILE = "app_database.db"
 
-# =====================================================================
-# CORES UNIVERSAIS E CONFIGURAÇÃO DE ACENTOS
-# =====================================================================
-COLOR_TEXT_PRIMARY = ("#0F172A", "#F8FAFC")     
+COLOR_TEXT_PRIMARY = ("#0F172A", "#F8FAFC")      
 COLOR_TEXT_SECONDARY = ("#475569", "#94A3B8")   
 COLOR_BG_SURFACE = ("#F1F5F9", "#0F172A")       
 COLOR_BG_CARD = ("#FFFFFF", "#1E293B")          
 COLOR_INPUT_BG = ("#FFFFFF", "#1E293B")         
 COLOR_BORDER = ("#CBD5E1", "#334155")           
 
-# Paleta completa de acentos (Cor Primária + Cor de Hover)
 COLOR_ACCENTS = {
     "azul": {"primary": "#2563EB", "hover": "#1D4ED8"},
     "vermelho": {"primary": "#DC2626", "hover": "#B91C1C"},
@@ -40,8 +38,41 @@ COLOR_ACCENTS = {
 }
 
 
+def inicializar_banco_sql():
+    try:
+        conexao = sqlite3.connect(DB_FILE)
+        conexao.row_factory = sqlite3.Row
+        cursor = conexao.cursor()
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS usuarios_db (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nome TEXT UNIQUE,
+                senha TEXT,
+                nivel TEXT
+            )
+        """)
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS logs_sistema (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                acao TEXT,
+                data_hora TEXT
+            )
+        """)
+        
+        cursor.execute("SELECT * FROM usuarios_db WHERE nome = ?", ("Root Master",))
+        if not cursor.fetchone():
+            cursor.execute("INSERT INTO usuarios_db (nome, senha, nivel) VALUES (?, ?, ?)", 
+                           ("Root Master", "12345678", "Administrador"))
+            conexao.commit()
+            
+        conexao.close()
+    except Exception as e:
+        print(f"[ERRO SQL] {e}")
+
+
 class GlobalHotkeyManager:
-    """Gerencia o atalho global Alt + Z."""
     def __init__(self, app_controller):
         self.controller = app_controller
         self.listener = None
@@ -60,7 +91,7 @@ class GlobalHotkeyManager:
             self.listener.daemon = True
             self.listener.start()
         except Exception as e:
-            print(f"[ERRO] Falha ao iniciar atalho global: {e}")
+            print(f"[ERRO] {e}")
 
     def ao_pressionar(self, key):
         try:
@@ -86,8 +117,6 @@ class GlobalHotkeyManager:
 
 
 class AccountManager:
-    """Gerencia leitura e gravação dos perfis e configurações."""
-
     @staticmethod
     def carregar_dados():
         if os.path.exists(CONFIG_FILE):
@@ -98,11 +127,11 @@ class AccountManager:
                         for p in dados["perfis"]:
                             p.setdefault("atalhos_custom", [])
                             p.setdefault("foto_perfil", "")
-                            p.setdefault("fundo_imagem", "")
+                            p.setdefault("cor_fundo", "#0F172A")
                             p.setdefault("modo_layout", "grid")
                         return dados
             except Exception as e:
-                print(f"[ERRO] Falha ao ler arquivo de configuração: {e}")
+                print(f"[ERRO] {e}")
 
         dados_padrao = {
             "perfis": [
@@ -111,7 +140,16 @@ class AccountManager:
                     "nome": "Jogador Principal",
                     "cor_acento": "azul",
                     "foto_perfil": "",
-                    "fundo_imagem": "",
+                    "cor_fundo": "#0F172A",
+                    "modo_layout": "grid",
+                    "atalhos_custom": []
+                },
+                {
+                    "id": "p_root",
+                    "nome": "Root Master",
+                    "cor_acento": "roxo",
+                    "foto_perfil": "",
+                    "cor_fundo": "#0F172A",
                     "modo_layout": "grid",
                     "atalhos_custom": []
                 }
@@ -128,19 +166,179 @@ class AccountManager:
             with open(CONFIG_FILE, "w", encoding="utf-8") as f:
                 json.dump(dados, f, indent=4, ensure_ascii=False)
         except Exception as e:
-            print(f"[ERRO] Falha ao salvar arquivo de configuração: {e}")
+            print(f"[ERRO] {e}")
+
+
+class JanelaSenhaModal(ctk.CTkToplevel):
+    def __init__(self, parent, callback_sucesso):
+        super().__init__(parent)
+        self.callback_sucesso = callback_sucesso
+        
+        self.title("Autenticação Root Master")
+        self.geometry("380x200")
+        self.resizable(False, False)
+        self.configure(fg_color=COLOR_BG_SURFACE)
+        self.attributes("-topmost", True)
+        
+        largura_tela = self.winfo_screenwidth()
+        altura_tela = self.winfo_screenheight()
+        x = (largura_tela - 380) // 2
+        y = (altura_tela - 200) // 2
+        self.geometry(f"380x200+{x}+{y}")
+
+        ctk.CTkLabel(
+            self,
+            text="🛡️ Acesso Restrito - Root Master",
+            font=("Segoe UI", 13, "bold"),
+            text_color=COLOR_TEXT_PRIMARY
+        ).pack(pady=(16, 8))
+
+        ctk.CTkLabel(
+            self,
+            text="Digite a senha cadastrada no banco SQL:",
+            font=("Segoe UI", 11),
+            text_color=COLOR_TEXT_SECONDARY
+        ).pack(pady=(0, 8))
+
+        self.entry_senha = ctk.CTkEntry(
+            self,
+            placeholder_text="Senha...",
+            show="*",
+            height=36,
+            width=300,
+            fg_color=COLOR_INPUT_BG,
+            text_color=COLOR_TEXT_PRIMARY,
+            border_color=COLOR_BORDER
+        )
+        self.entry_senha.pack(pady=4)
+        self.entry_senha.focus()
+        self.entry_senha.bind("<Return>", lambda e: self.verificar())
+
+        btn_frame = ctk.CTkFrame(self, fg_color="transparent")
+        btn_frame.pack(pady=12)
+
+        ctk.CTkButton(
+            btn_frame,
+            text="Confirmar",
+            width=130,
+            height=32,
+            fg_color="#16A34A",
+            hover_color="#15803D",
+            text_color="#FFFFFF",
+            font=("Segoe UI", 11, "bold"),
+            command=self.verificar
+        ).pack(side="left", padx=6)
+
+        ctk.CTkButton(
+            btn_frame,
+            text="Cancelar",
+            width=130,
+            height=32,
+            fg_color="#EF4444",
+            hover_color="#DC2626",
+            text_color="#FFFFFF",
+            font=("Segoe UI", 11, "bold"),
+            command=self.destroy
+        ).pack(side="left", padx=6)
+
+    def verificar(self):
+        senha = self.entry_senha.get().strip()
+        if not senha:
+            return
+
+        try:
+            conexao = sqlite3.connect(DB_FILE)
+            cursor = conexao.cursor()
+            cursor.execute("SELECT senha FROM usuarios_db WHERE nome = ?", ("Root Master",))
+            resultado = cursor.fetchone()
+            conexao.close()
+
+            if resultado and resultado[0] == senha:
+                self.destroy()
+                self.callback_sucesso()
+            else:
+                self.entry_senha.delete(0, "end")
+        except Exception as e:
+            print(f"[ERRO SQL] {e}")
+
+
+class PainelAdmWindow(ctk.CTkToplevel):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.title("Painel Administrativo - Root Master")
+        self.geometry("500x400")
+        self.configure(fg_color=COLOR_BG_SURFACE)
+        self.attributes("-topmost", True)
+
+        ctk.CTkLabel(
+            self,
+            text="🛠️ Painel de Controle Administrativo",
+            font=("Segoe UI", 16, "bold"),
+            text_color=COLOR_TEXT_PRIMARY
+        ).pack(pady=20)
+
+        ctk.CTkLabel(
+            self,
+            text="Bem-vindo ao painel de gerenciamento exclusivo do ADM.",
+            font=("Segoe UI", 12),
+            text_color=COLOR_TEXT_SECONDARY
+        ).pack(pady=5)
+
+        ctk.CTkButton(
+            self,
+            text="📥 Exportar Dados SQL para JSON",
+            width=300,
+            height=40,
+            fg_color="#9333EA",
+            hover_color="#7E22CE",
+            text_color="#FFFFFF",
+            font=("Segoe UI", 12, "bold"),
+            command=self.executar_exportacao_json
+        ).pack(pady=20)
+
+        ctk.CTkButton(
+            self,
+            text="Fechar Painel",
+            width=150,
+            height=35,
+            fg_color="#EF4444",
+            hover_color="#DC2626",
+            text_color="#FFFFFF",
+            command=self.destroy
+        ).pack(pady=10)
+
+    def executar_exportacao_json(self):
+        try:
+            conexao = sqlite3.connect(DB_FILE)
+            conexao.row_factory = sqlite3.Row
+            cursor = conexao.cursor()
+            
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+            tabelas = cursor.fetchall()
+
+            dados_completos = {}
+            for tabela in tabelas:
+                nome_tabela = tabela["name"]
+                cursor.execute(f"SELECT * FROM {nome_tabela}")
+                linhas = cursor.fetchall()
+                dados_completos[nome_tabela] = [dict(linha) for linha in linhas]
+
+            conexao.close()
+
+            with open("backup_banco_sql.json", "w", encoding="utf-8") as f:
+                json.dump(dados_completos, f, ensure_ascii=False, indent=4)
+        except Exception as e:
+            print(f"[ERRO] {e}")
 
 
 class ProfileSelectorFrame(ctk.CTkFrame):
-    """Tela de Seleção de Perfis com Opção de Criar e Excluir."""
-
     def __init__(self, parent, controller):
-        super().__init__(parent, fg_color=COLOR_BG_SURFACE, corner_radius=12)
+        super().__init__(parent, fg_color="transparent", corner_radius=12)
         self.controller = controller
         self.criar_interface()
 
     def criar_interface(self):
-        header = ctk.CTkFrame(self, fg_color=COLOR_BG_SURFACE, height=50, corner_radius=0)
+        header = ctk.CTkFrame(self, fg_color="transparent", height=50, corner_radius=0)
         header.pack(fill="x")
 
         lbl_titulo = ctk.CTkLabel(
@@ -219,9 +417,11 @@ class ProfileSelectorFrame(ctk.CTkFrame):
                 except Exception:
                     img_avatar = None
 
+            is_root = perfil["nome"] == "Root Master"
+
             lbl_avatar = ctk.CTkLabel(
                 card,
-                text="" if img_avatar else "👤",
+                text="" if img_avatar else ("🛡️" if is_root else "👤"),
                 image=img_avatar,
                 width=42,
                 height=42,
@@ -254,28 +454,37 @@ class ProfileSelectorFrame(ctk.CTkFrame):
                 hover_color="#15803D",
                 text_color="#FFFFFF",
                 font=("Segoe UI", 11, "bold"),
-                command=lambda p=perfil: self.controller.entrar_no_perfil(p),
+                command=lambda p=perfil: self.tentar_entrar_perfil(p),
             )
             btn_entrar.pack(side="right", padx=12)
 
-            # Botão de excluir conta
-            btn_excluir = ctk.CTkButton(
-                card,
-                text="🗑️",
-                width=36,
-                height=32,
-                corner_radius=6,
-                fg_color="#EF4444",
-                hover_color="#DC2626",
-                text_color="#FFFFFF",
-                font=("Segoe UI", 12),
-                command=lambda p=perfil: self.acao_excluir_perfil(p),
-            )
-            btn_excluir.pack(side="right", padx=(0, 4))
+            if not is_root:
+                btn_excluir = ctk.CTkButton(
+                    card,
+                    text="🗑️",
+                    width=36,
+                    height=32,
+                    corner_radius=6,
+                    fg_color="#EF4444",
+                    hover_color="#DC2626",
+                    text_color="#FFFFFF",
+                    font=("Segoe UI", 12),
+                    command=lambda p=perfil: self.acao_excluir_perfil(p),
+                )
+                btn_excluir.pack(side="right", padx=(0, 4))
+
+    def tentar_entrar_perfil(self, perfil):
+        if perfil["nome"] == "Root Master":
+            JanelaSenhaModal(self.controller, lambda: self.controller.entrar_no_perfil(perfil))
+        else:
+            self.controller.entrar_no_perfil(perfil)
 
     def acao_criar_perfil(self):
         nome = self.entry_novo_nome.get().strip()
         if not nome:
+            return
+
+        if nome.lower() == "root master":
             return
 
         novo_id = f"p_{int(time.time())}"
@@ -284,7 +493,7 @@ class ProfileSelectorFrame(ctk.CTkFrame):
             "nome": nome,
             "cor_acento": "azul",
             "foto_perfil": "",
-            "fundo_imagem": "",
+            "cor_fundo": "#0F172A",
             "modo_layout": "grid",
             "atalhos_custom": []
         }
@@ -296,9 +505,10 @@ class ProfileSelectorFrame(ctk.CTkFrame):
         self.controller.entrar_no_perfil(novo_perfil)
 
     def acao_excluir_perfil(self, perfil):
+        if perfil["nome"] == "Root Master":
+            return
+
         perfis = self.controller.dados_config.get("perfis", [])
-        
-        # Impede excluir se houver apenas 1 perfil restante
         if len(perfis) <= 1:
             return
 
@@ -308,10 +518,8 @@ class ProfileSelectorFrame(ctk.CTkFrame):
 
 
 class DashboardFrame(ctk.CTkFrame):
-    """Painel Principal Dashboard Overlay."""
-
     def __init__(self, parent, controller):
-        super().__init__(parent, fg_color=COLOR_BG_SURFACE, corner_radius=12)
+        super().__init__(parent, fg_color="transparent", corner_radius=12)
         self.controller = controller
 
         self._offset_x = 0
@@ -322,19 +530,19 @@ class DashboardFrame(ctk.CTkFrame):
         self.dynamic_accent_borders = []
         
         self.icone_foto_temp = ""
-        self.lbl_fundo_bg = None
+
+        self.video_path = None
+        self.video_rodando = False
+        self.video_pausado = False
+        self.video_thread = None
 
         self.criar_interface()
         self.atualizar_monitor_sistema()
 
     def criar_interface(self):
-        self.lbl_fundo_bg = ctk.CTkLabel(self, text="", fg_color="transparent")
-        self.lbl_fundo_bg.place(x=0, y=0, relwidth=1, relheight=1)
-        self.lbl_fundo_bg.lower()
-
         self.header_frame = ctk.CTkFrame(
             self,
-            fg_color=COLOR_BG_SURFACE,
+            fg_color="transparent",
             corner_radius=12,
             border_color=COLOR_BORDER,
             border_width=1,
@@ -451,7 +659,7 @@ class DashboardFrame(ctk.CTkFrame):
 
         self.frame_busca = ctk.CTkFrame(
             self,
-            fg_color=COLOR_BG_SURFACE,
+            fg_color="transparent",
             corner_radius=12,
             border_color=COLOR_BORDER,
             border_width=1,
@@ -499,7 +707,7 @@ class DashboardFrame(ctk.CTkFrame):
         self.tabview = ctk.CTkTabview(
             self,
             corner_radius=12,
-            fg_color=COLOR_BG_SURFACE,
+            fg_color="transparent",
             border_color=COLOR_BORDER,
             border_width=1,
             text_color=COLOR_TEXT_PRIMARY,
@@ -522,23 +730,17 @@ class DashboardFrame(ctk.CTkFrame):
         self.montar_aba_player_video()
         self.montar_aba_config()
 
-    def atualizar_fundo_tela(self, caminho_img):
-        if caminho_img and os.path.exists(caminho_img):
-            try:
-                pil_img = Image.open(caminho_img)
-                pil_img = pil_img.resize((920, 800), Image.Resampling.LANCZOS)
-                ctk_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(920, 800))
-                self.lbl_fundo_bg.configure(image=ctk_img)
-                return
-            except Exception as e:
-                print(f"[ERRO] Falha ao carregar fundo de tela: {e}")
-        self.lbl_fundo_bg.configure(image="")
-
     def carregar_perfil(self, perfil):
         self.lbl_titulo.configure(text=f"OmniOverlay - {perfil['nome']}")
         self.aplicar_cor_acento(perfil.get("cor_acento", "azul"))
         self.atualizar_foto_avatar(perfil.get("foto_perfil", ""))
-        self.atualizar_fundo_tela(perfil.get("fundo_imagem", ""))
+        
+        # Respeita o modo claro/escuro global para o fundo caso esteja no padrão, senão aplica a cor customizada
+        if self.controller.modo_tema_atual == "light":
+            self.controller.atualizar_cor_fundo_raiz("#F1F5F9")
+        else:
+            self.controller.atualizar_cor_fundo_raiz(perfil.get("cor_fundo", "#0F172A"))
+            
         self.atualizar_atalhos_customizados()
 
     def atualizar_monitor_sistema(self):
@@ -565,8 +767,8 @@ class DashboardFrame(ctk.CTkFrame):
 
                 cor_ram = "#16A34A" if ram.percent < 70 else ("#EAB308" if ram.percent < 88 else "#EF4444")
                 self.bar_ram_detalhada.configure(progress_color=cor_ram)
-        except Exception as e:
-            print(f"[MONITOR] Erro: {e}")
+        except Exception:
+            pass
 
         self.after(1500, self.atualizar_monitor_sistema)
 
@@ -577,9 +779,9 @@ class DashboardFrame(ctk.CTkFrame):
                 img_avatar = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(32, 32))
                 self.btn_avatar.configure(image=img_avatar, text="")
                 return
-            except Exception as e:
-                print(f"[ERRO] Falha ao carregar avatar: {e}")
-        self.btn_avatar.configure(image="", text="👤")
+            except Exception:
+                pass
+        self.btn_avatar.configure(image="", text="👤" if self.controller.perfil_ativo["nome"] != "Root Master" else "🛡️")
 
     def trocar_foto_perfil(self):
         caminho = filedialog.askopenfilename(
@@ -665,7 +867,7 @@ class DashboardFrame(ctk.CTkFrame):
             else:
                 subprocess.Popen(alvo, shell=True)
         except Exception as e:
-            print(f"[ERRO] Falha ao abrir alvo '{alvo}': {e}")
+            print(f"[ERRO] {e}")
 
     def montar_aba_hub(self):
         frame_adicionar = ctk.CTkFrame(self.tab_hub, fg_color=COLOR_BG_CARD, corner_radius=10, border_color=COLOR_BORDER, border_width=1)
@@ -797,6 +999,7 @@ class DashboardFrame(ctk.CTkFrame):
             ("🚀 Steam", "steam://open/main"),
             ("🛡️ Epic Games", "epicgames://"),
             ("💬 Discord", "https://discord.com/app"),
+            ("💻 Discord App", "discord://"),
             ("🎮 Roblox", "https://www.roblox.com"),
             ("🔴 Roblox App", "roblox://"),
             ("🌐 Poki Jogos", "https://poki.com"),
@@ -1048,13 +1251,10 @@ class DashboardFrame(ctk.CTkFrame):
             text="🎬 Player de Vídeo em Overlay",
             font=("Segoe UI", 13, "bold"),
             text_color=COLOR_TEXT_PRIMARY
-        ).pack(anchor="w", pady=(0, 8))
-
-        self.videoplayer = TkinterVideo(video_container, scaled=True, background="#0F172A")
-        self.videoplayer.pack(fill="both", expand=True, pady=(0, 8))
+        ).pack(anchor="w", pady=(0, 4))
 
         controles_video = ctk.CTkFrame(video_container, fg_color=COLOR_BG_CARD, corner_radius=10, border_color=COLOR_BORDER, border_width=1)
-        controles_video.pack(fill="x", pady=4)
+        controles_video.pack(side="bottom", fill="x", pady=(4, 0))
         self.dynamic_accent_borders.append(controles_video)
 
         btn_escolher_video = ctk.CTkButton(
@@ -1070,7 +1270,7 @@ class DashboardFrame(ctk.CTkFrame):
         btn_escolher_video.pack(side="left", padx=8, pady=8)
         self.dynamic_accent_buttons.append(btn_escolher_video)
 
-        btn_play = ctk.CTkButton(
+        self.btn_play_video = ctk.CTkButton(
             controles_video,
             text="▶️ Play / Pause",
             width=110,
@@ -1080,7 +1280,10 @@ class DashboardFrame(ctk.CTkFrame):
             text_color=COLOR_TEXT_PRIMARY,
             command=self.toggle_play_video
         )
-        btn_play.pack(side="left", padx=4, pady=8)
+        self.btn_play_video.pack(side="left", padx=4, pady=8)
+
+        self.lbl_video_display = ctk.CTkLabel(video_container, text="Nenhum vídeo carregado", fg_color="#0F172A", corner_radius=8)
+        self.lbl_video_display.pack(side="top", fill="both", expand=True, pady=(0, 4))
 
     def carregar_arquivo_video(self):
         caminho = filedialog.askopenfilename(
@@ -1088,20 +1291,65 @@ class DashboardFrame(ctk.CTkFrame):
             filetypes=[("Arquivos de Vídeo", "*.mp4 *.avi *.mkv *.mov"), ("Todos os Arquivos", "*.*")]
         )
         if caminho:
+            self.video_rodando = False
+            time.sleep(0.1) 
+            self.video_path = caminho
+            self.video_rodando = True
+            self.video_pausado = False
+            self.btn_play_video.configure(text="⏸️ Pausar")
+            
+            self.video_thread = threading.Thread(target=self._executar_loop_video, daemon=True)
+            self.video_thread.start()
+
+    def _executar_loop_video(self):
+        cap = cv2.VideoCapture(self.video_path)
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        if fps <= 0 or fps > 60:
+            fps = 30
+        delay = 1.0 / fps
+
+        while self.video_rodando and cap.isOpened():
+            if self.video_pausado:
+                time.sleep(0.1)
+                continue
+
+            ret, frame = cap.read()
+            if not ret:
+                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                continue
+
             try:
-                self.videoplayer.load(caminho)
-                self.videoplayer.play()
-            except Exception as e:
-                print(f"[ERRO] Falha ao carregar vídeo: {e}")
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                pil_img = Image.fromarray(frame_rgb)
+                
+                max_w = max(self.lbl_video_display.winfo_width(), 300)
+                max_h = max(self.lbl_video_display.winfo_height(), 200)
+                
+                orig_w, orig_h = pil_img.size
+                ratio = min(max_w / orig_w, max_h / orig_h)
+                new_w = int(orig_w * ratio)
+                new_h = int(orig_h * ratio)
+                
+                pil_img = pil_img.resize((new_w, new_h), Image.Resampling.BILINEAR)
+                ctk_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(new_w, new_h))
+                
+                self.after(0, lambda img=ctk_img: self.lbl_video_display.configure(image=img, text=""))
+            except Exception:
+                pass
+
+            time.sleep(delay)
+
+        cap.release()
 
     def toggle_play_video(self):
-        try:
-            if self.videoplayer.is_paused():
-                self.videoplayer.play()
-            else:
-                self.videoplayer.pause()
-        except Exception:
-            pass
+        if not self.video_path:
+            return
+        
+        self.video_pausado = not self.video_pausado
+        if self.video_pausado:
+            self.btn_play_video.configure(text="▶️ Retomar")
+        else:
+            self.btn_play_video.configure(text="⏸️ Pausar")
 
     def montar_aba_config(self):
         config_container = ctk.CTkScrollableFrame(self.tab_config, fg_color="transparent")
@@ -1109,10 +1357,41 @@ class DashboardFrame(ctk.CTkFrame):
 
         ctk.CTkLabel(
             config_container,
-            text="⚙️ Aparência & Temas de Cores",
+            text="🛡️ Painel Administrativo (Root Master)",
             font=("Segoe UI", 12, "bold"),
             text_color=COLOR_TEXT_PRIMARY
         ).pack(anchor="w", padx=8, pady=(4, 8))
+
+        frame_root = ctk.CTkFrame(config_container, fg_color=COLOR_BG_CARD, corner_radius=10, border_color="#9333EA", border_width=1)
+        frame_root.pack(fill="x", padx=4, pady=4, ipady=6)
+        self.dynamic_accent_borders.append(frame_root)
+
+        ctk.CTkLabel(
+            frame_root,
+            text="Acesse o Painel ADM protegido por senha:",
+            font=("Segoe UI", 11),
+            text_color=COLOR_TEXT_PRIMARY
+        ).pack(anchor="w", padx=12, pady=(8, 4))
+
+        btn_abrir_adm = ctk.CTkButton(
+            frame_root,
+            text="🔐 Abrir Painel ADM",
+            width=220,
+            height=34,
+            fg_color="#9333EA",
+            hover_color="#7E22CE",
+            text_color="#FFFFFF",
+            font=("Segoe UI", 11, "bold"),
+            command=self.acao_abrir_painel_adm
+        )
+        btn_abrir_adm.pack(anchor="w", padx=12, pady=(0, 10))
+
+        ctk.CTkLabel(
+            config_container,
+            text="⚙️ Aparência & Temas de Cores",
+            font=("Segoe UI", 12, "bold"),
+            text_color=COLOR_TEXT_PRIMARY
+        ).pack(anchor="w", padx=8, pady=(16, 8))
 
         frame_cores = ctk.CTkFrame(config_container, fg_color=COLOR_BG_CARD, corner_radius=10, border_color=COLOR_BORDER, border_width=1)
         frame_cores.pack(fill="x", padx=4, pady=4, ipady=4)
@@ -1145,28 +1424,45 @@ class DashboardFrame(ctk.CTkFrame):
 
         ctk.CTkLabel(
             config_container,
-            text="🖼️ Plano de Fundo Customizado",
+            text="🎨 Cor Sólida de Fundo do Perfil",
             font=("Segoe UI", 12, "bold"),
             text_color=COLOR_TEXT_PRIMARY
         ).pack(anchor="w", padx=8, pady=(16, 8))
 
-        frame_fundo = ctk.CTkFrame(config_container, fg_color=COLOR_BG_CARD, corner_radius=10, border_color=COLOR_BORDER, border_width=1)
-        frame_fundo.pack(fill="x", padx=4, pady=4, ipady=4)
-        self.dynamic_accent_borders.append(frame_fundo)
+        frame_fundo_cor = ctk.CTkFrame(config_container, fg_color=COLOR_BG_CARD, corner_radius=10, border_color=COLOR_BORDER, border_width=1)
+        frame_fundo_cor.pack(fill="x", padx=4, pady=4, ipady=4)
+        self.dynamic_accent_borders.append(frame_fundo_cor)
 
-        btn_escolher_fundo = ctk.CTkButton(
-            frame_fundo,
-            text="📁 Escolher Imagem de Fundo",
-            width=200,
-            height=34,
-            fg_color="#2563EB",
-            hover_color="#1D4ED8",
-            text_color="#FFFFFF",
-            font=("Segoe UI", 11, "bold"),
-            command=self.selecionar_fundo_customizado
-        )
-        btn_escolher_fundo.pack(anchor="w", padx=12, pady=10)
-        self.dynamic_accent_buttons.append(btn_escolher_fundo)
+        ctk.CTkLabel(
+            frame_fundo_cor,
+            text="Selecione um estilo de cor para o plano de fundo:",
+            font=("Segoe UI", 11),
+            text_color=COLOR_TEXT_PRIMARY
+        ).pack(anchor="w", padx=12, pady=(8, 4))
+
+        botoes_fundo_frame = ctk.CTkFrame(frame_fundo_cor, fg_color="transparent")
+        botoes_fundo_frame.pack(anchor="w", padx=12, pady=(0, 10))
+
+        cores_fundo_opcoes = [
+            ("Dark Midnight", "#0F172A"),
+            ("Dark Slate", "#1E293B"),
+            ("Azul Profundo", "#1E3A8A"),
+            ("Roxo Noturno", "#3B0764"),
+            ("Verde Militar", "#064E3B")
+        ]
+        for nome_c, hex_c in cores_fundo_opcoes:
+            btn_f_cor = ctk.CTkButton(
+                botoes_fundo_frame,
+                text=nome_c,
+                width=110,
+                height=30,
+                fg_color=hex_c,
+                hover_color=hex_c,
+                text_color="#FFFFFF",
+                font=("Segoe UI", 10, "bold"),
+                command=lambda hc=hex_c: self.alterar_cor_fundo_perfil(hc)
+            )
+            btn_f_cor.pack(side="left", padx=3)
 
         ctk.CTkLabel(
             config_container,
@@ -1179,60 +1475,41 @@ class DashboardFrame(ctk.CTkFrame):
         frame_hw_detalhado.pack(fill="x", padx=4, pady=4, ipady=8)
         self.dynamic_accent_borders.append(frame_hw_detalhado)
 
-        ctk.CTkLabel(
-            frame_hw_detalhado,
-            text="Uso da CPU:",
-            font=("Segoe UI", 10, "bold"),
-            text_color=COLOR_TEXT_PRIMARY
-        ).pack(anchor="w", padx=12, pady=(6, 0))
-        
+        ctk.CTkLabel(frame_hw_detalhado, text="Uso da CPU:", font=("Segoe UI", 10, "bold"), text_color=COLOR_TEXT_PRIMARY).pack(anchor="w", padx=12, pady=(6, 0))
         self.bar_cpu_detalhada = ctk.CTkProgressBar(frame_hw_detalhado, height=12)
         self.bar_cpu_detalhada.pack(fill="x", padx=12, pady=2)
         self.bar_cpu_detalhada.set(0)
 
-        self.lbl_cpu_valor_detalhado = ctk.CTkLabel(
-            frame_hw_detalhado,
-            text="0.0%",
-            font=("Segoe UI", 10),
-            text_color=COLOR_TEXT_PRIMARY
-        )
+        self.lbl_cpu_valor_detalhado = ctk.CTkLabel(frame_hw_detalhado, text="0.0%", font=("Segoe UI", 10), text_color=COLOR_TEXT_PRIMARY)
         self.lbl_cpu_valor_detalhado.pack(anchor="e", padx=12)
 
-        ctk.CTkLabel(
-            frame_hw_detalhado,
-            text="Uso da Memória RAM:",
-            font=("Segoe UI", 10, "bold"),
-            text_color=COLOR_TEXT_PRIMARY
-        ).pack(anchor="w", padx=12, pady=(6, 0))
-        
+        ctk.CTkLabel(frame_hw_detalhado, text="Uso da Memória RAM:", font=("Segoe UI", 10, "bold"), text_color=COLOR_TEXT_PRIMARY).pack(anchor="w", padx=12, pady=(6, 0))
         self.bar_ram_detalhada = ctk.CTkProgressBar(frame_hw_detalhado, height=12)
         self.bar_ram_detalhada.pack(fill="x", padx=12, pady=2)
         self.bar_ram_detalhada.set(0)
 
-        self.lbl_ram_valor_detalhado = ctk.CTkLabel(
-            frame_hw_detalhado,
-            text="0.0%",
-            font=("Segoe UI", 10),
-            text_color=COLOR_TEXT_PRIMARY
-        )
+        self.lbl_ram_valor_detalhado = ctk.CTkLabel(frame_hw_detalhado, text="0.0%", font=("Segoe UI", 10), text_color=COLOR_TEXT_PRIMARY)
         self.lbl_ram_valor_detalhado.pack(anchor="e", padx=12)
 
-    def selecionar_fundo_customizado(self):
-        caminho = filedialog.askopenfilename(
-            title="Escolha a Imagem de Fundo",
-            filetypes=[("Imagens", "*.png *.jpg *.jpeg *.bmp")]
-        )
-        if caminho and self.controller.perfil_ativo:
-            self.controller.perfil_ativo["fundo_imagem"] = caminho
+    def acao_abrir_painel_adm(self):
+        JanelaSenhaModal(self.controller, lambda: PainelAdmWindow(self.controller))
+
+    def alterar_cor_fundo_perfil(self, hex_cor):
+        if self.controller.modo_tema_atual == "light":
+            print("[AVISO] Você está no Modo Claro. Mude para o Modo Escuro para customizar cores sólidas escuras de fundo.")
+            return
+
+        if self.controller.perfil_ativo:
+            self.controller.perfil_ativo["cor_fundo"] = hex_cor
             AccountManager.salvar_dados(self.controller.dados_config)
-            self.atualizar_fundo_tela(caminho)
+            self.controller.atualizar_cor_fundo_raiz(hex_cor)
 
 
 class OmniOverlayApp(ctk.CTk):
-    """Janela Principal e Controlador de Estados do OmniOverlay."""
-
     def __init__(self):
         super().__init__()
+
+        inicializar_banco_sql()
 
         self.dados_config = AccountManager.carregar_dados()
         self.modo_tema_atual = self.dados_config.get("modo_tema", "dark")
@@ -1240,13 +1517,14 @@ class OmniOverlayApp(ctk.CTk):
 
         self.title("OmniOverlay")
         self.geometry("920x800")
-        self.overrideredirect(True)
+        self.overrideredirect(False)
         self.attributes("-alpha", 0.98)
-        self.configure(bg_color=COLOR_BG_SURFACE)
 
         self.perfil_ativo = None
         
-        self.container = ctk.CTkFrame(self, fg_color="transparent")
+        # Container principal com cor adaptativa inicial baseada no tema
+        cor_inicial_container = "#F1F5F9" if self.modo_tema_atual == "light" else "#0F172A"
+        self.container = ctk.CTkFrame(self, fg_color=cor_inicial_container)
         self.container.pack(fill="both", expand=True)
 
         self.profile_frame = ProfileSelectorFrame(self.container, self)
@@ -1257,6 +1535,12 @@ class OmniOverlayApp(ctk.CTk):
 
         self.centralizar_janela(920, 800)
         self.verificar_perfil_inicial()
+
+    def atualizar_cor_fundo_raiz(self, hex_cor):
+        try:
+            self.container.configure(fg_color=hex_cor)
+        except Exception as e:
+            print(f"[ERRO] {e}")
 
     def centralizar_janela(self, largura, altura):
         largura_tela = self.winfo_screenwidth()
@@ -1293,6 +1577,11 @@ class OmniOverlayApp(ctk.CTk):
         self.profile_frame.pack_forget()
         self.dashboard_frame.pack(fill="both", expand=True)
         self.dashboard_frame.carregar_perfil(perfil)
+        
+        if self.modo_tema_atual == "light":
+            self.atualizar_cor_fundo_raiz("#F1F5F9")
+        else:
+            self.atualizar_cor_fundo_raiz(perfil.get("cor_fundo", "#0F172A"))
 
     def abrir_seletor_perfis(self):
         self.dashboard_frame.pack_forget()
@@ -1308,6 +1597,13 @@ class OmniOverlayApp(ctk.CTk):
         ctk.set_appearance_mode(self.modo_tema_atual)
         self.dados_config["modo_tema"] = self.modo_tema_atual
         AccountManager.salvar_dados(self.dados_config)
+
+        # Ajusta instantaneamente a cor do container principal conforme o tema alternado
+        if self.modo_tema_atual == "light":
+            self.atualizar_cor_fundo_raiz("#F1F5F9")
+        else:
+            if self.perfil_ativo:
+                self.atualizar_cor_fundo_raiz(self.perfil_ativo.get("cor_fundo", "#0F172A"))
 
         self.dashboard_frame.destroy()
         self.dashboard_frame = DashboardFrame(self.container, self)
