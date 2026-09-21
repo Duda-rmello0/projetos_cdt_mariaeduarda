@@ -1339,3 +1339,4 @@ def atualizar_fundo_tela(self, caminho_img):
         
         self.imagem_fundo_atual = None
         self.lbl_fundo_bg.configure(image="", text="")
+        
