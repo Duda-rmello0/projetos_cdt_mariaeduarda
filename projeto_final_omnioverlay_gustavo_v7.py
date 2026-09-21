@@ -537,7 +537,7 @@ class DashboardFrame(ctk.CTkFrame):
     """Painel Principal Dashboard Overlay."""
 
     def __init__(self, parent, controller):
-        super().__init__(parent, fg_color=COLOR_BG_SURFACE, corner_radius=12)
+        super().__init__(parent, fg_color="transparent", corner_radius=12)
         self.controller = controller
 
         self._offset_x = 0
@@ -702,7 +702,7 @@ class DashboardFrame(ctk.CTkFrame):
             text="📁 Buscar App",
             width=100,
             height=38,
-            fg_color=COLOR_BG_CARD,
+            fg_color="transparent",
             hover_color=COLOR_BORDER,
             text_color=COLOR_TEXT_PRIMARY,
             command=self.selecionar_executavel_direto,
@@ -760,7 +760,6 @@ class DashboardFrame(ctk.CTkFrame):
                 print(f"[ERRO] Falha ao carregar fundo de tela: {e}")
         self.lbl_fundo_bg.configure(image="")
         
-    
 
     def carregar_perfil(self, perfil):
         self.lbl_titulo.configure(text=f"OmniOverlay - {perfil['nome']}")
@@ -1483,14 +1482,15 @@ class DashboardFrame(ctk.CTkFrame):
                 
                 self.lbl_fundo_bg.configure(image=self.imagem_fundo_atual, text="")
                 self.lbl_fundo_bg.place(x=0, y=0, relwidth=1, relheight=1)
-                self.lbl_fundo_bg.lower() # Mantém estritamente no fundo
+                self.lbl_fundo_bg.lower()  # Mantém estritamente no fundo
                 return
             except Exception as e:
                 print(f"[ERRO] Falha ao carregar fundo de tela: {e}")
         
         self.imagem_fundo_atual = None
         self.lbl_fundo_bg.configure(image="", text="")
-
+        
+    
 
 class OmniOverlayApp(ctk.CTk):
     """Janela Principal e Controlador de Estados do OmniOverlay."""
