@@ -1,8 +1,6 @@
 """
 ===============================================================================
 PROJETO: OmniOverlay - Dynamic Accent Colors, Full Theme, Profile & Root Master
-
-Aprensentação Final 
 ===============================================================================
 """
 
@@ -15,9 +13,9 @@ import webbrowser
 import threading
 import sqlite3
 import customtkinter as ctk
-from tkinter import filedialog
-from PIL import Image, ImageTk
-from tkVideoPlayer import TkinterVideo
+from tkinter import filedialog, messagebox
+from PIL import Image, ImageTk, ImageOps, ImageDraw
+import cv2
 
 import psutil
 from pynput import keyboard
@@ -25,7 +23,7 @@ from pynput import keyboard
 CONFIG_FILE = "app_config.json"
 DB_FILE = "app_database.db"
 
-COLOR_TEXT_PRIMARY = ("#0F172A", "#F8FAFC")     
+COLOR_TEXT_PRIMARY = ("#0F172A", "#F8FAFC")      
 COLOR_TEXT_SECONDARY = ("#475569", "#94A3B8")   
 COLOR_BG_SURFACE = ("#F1F5F9", "#0F172A")       
 COLOR_BG_CARD = ("#FFFFFF", "#1E293B")          
@@ -41,7 +39,6 @@ COLOR_ACCENTS = {
 
 
 def inicializar_banco_sql():
-    """Inicializa o banco de dados SQLite e cria o Root Master com a senha 12345678."""
     try:
         conexao = sqlite3.connect(DB_FILE)
         conexao.row_factory = sqlite3.Row
@@ -69,15 +66,30 @@ def inicializar_banco_sql():
             cursor.execute("INSERT INTO usuarios_db (nome, senha, nivel) VALUES (?, ?, ?)", 
                            ("Root Master", "12345678", "Administrador"))
             conexao.commit()
-            print("[BANCO] Usuário Root Master criado com sucesso no banco SQL!")
             
         conexao.close()
     except Exception as e:
-        print(f"[ERRO SQL] Falha ao inicializar banco: {e}")
+        print(f"[ERRO SQL] {e}")
+
+
+def criar_avatar_circular(caminho_imagem, tamanho=(40, 40)):
+    try:
+        img = Image.open(caminho_imagem).convert("RGBA")
+        img = ImageOps.fit(img, tamanho, Image.Resampling.LANCZOS)
+        
+        mascara = Image.new("L", tamanho, 0)
+        draw = ImageDraw.Draw(mascara)
+        draw.ellipse((0, 0, tamanho[0], tamanho[1]), fill=255)
+        
+        resultado = Image.new("RGBA", tamanho, (0, 0, 0, 0))
+        resultado.paste(img, (0, 0), mascara)
+        return resultado
+    except Exception as e:
+        print(f"[ERRO AVATAR] {e}")
+        return None
 
 
 class GlobalHotkeyManager:
-    """Gerencia o atalho global Alt + Z."""
     def __init__(self, app_controller):
         self.controller = app_controller
         self.listener = None
@@ -96,7 +108,7 @@ class GlobalHotkeyManager:
             self.listener.daemon = True
             self.listener.start()
         except Exception as e:
-            print(f"[ERRO] Falha ao iniciar atalho global: {e}")
+            print(f"[ERRO] {e}")
 
     def ao_pressionar(self, key):
         try:
@@ -122,8 +134,6 @@ class GlobalHotkeyManager:
 
 
 class AccountManager:
-    """Gerencia leitura e gravação das configurações gerais."""
-
     @staticmethod
     def carregar_dados():
         if os.path.exists(CONFIG_FILE):
@@ -134,11 +144,11 @@ class AccountManager:
                         for p in dados["perfis"]:
                             p.setdefault("atalhos_custom", [])
                             p.setdefault("foto_perfil", "")
-                            p.setdefault("fundo_imagem", "")
+                            p.setdefault("cor_fundo", "#0F172A")
                             p.setdefault("modo_layout", "grid")
                         return dados
             except Exception as e:
-                print(f"[ERRO] Falha ao ler arquivo de configuração: {e}")
+                print(f"[ERRO] {e}")
 
         dados_padrao = {
             "perfis": [
@@ -147,7 +157,7 @@ class AccountManager:
                     "nome": "Jogador Principal",
                     "cor_acento": "azul",
                     "foto_perfil": "",
-                    "fundo_imagem": "",
+                    "cor_fundo": "#0F172A",
                     "modo_layout": "grid",
                     "atalhos_custom": []
                 },
@@ -156,7 +166,7 @@ class AccountManager:
                     "nome": "Root Master",
                     "cor_acento": "roxo",
                     "foto_perfil": "",
-                    "fundo_imagem": "",
+                    "cor_fundo": "#0F172A",
                     "modo_layout": "grid",
                     "atalhos_custom": []
                 }
@@ -173,11 +183,10 @@ class AccountManager:
             with open(CONFIG_FILE, "w", encoding="utf-8") as f:
                 json.dump(dados, f, indent=4, ensure_ascii=False)
         except Exception as e:
-            print(f"[ERRO] Falha ao salvar arquivo de configuração: {e}")
+            print(f"[ERRO] {e}")
 
 
 class JanelaSenhaModal(ctk.CTkToplevel):
-    """Janela customizada e segura para inserção de senha do Root Master."""
     def __init__(self, parent, callback_sucesso):
         super().__init__(parent)
         self.callback_sucesso = callback_sucesso
@@ -265,14 +274,12 @@ class JanelaSenhaModal(ctk.CTkToplevel):
                 self.destroy()
                 self.callback_sucesso()
             else:
-                print("[ACESSO NEGADO] Senha incorreta!")
                 self.entry_senha.delete(0, "end")
         except Exception as e:
-            print(f"[ERRO SQL] Falha ao autenticar: {e}")
+            print(f"[ERRO SQL] {e}")
 
 
 class PainelAdmWindow(ctk.CTkToplevel):
-    """Nova aba/janela separada para o Painel Administrativo de ADM."""
     def __init__(self, parent):
         super().__init__(parent)
         self.title("Painel Administrativo - Root Master")
@@ -294,7 +301,6 @@ class PainelAdmWindow(ctk.CTkToplevel):
             text_color=COLOR_TEXT_SECONDARY
         ).pack(pady=5)
 
-        # Botão para exportação do banco dentro do painel ADM
         ctk.CTkButton(
             self,
             text="📥 Exportar Dados SQL para JSON",
@@ -338,22 +344,18 @@ class PainelAdmWindow(ctk.CTkToplevel):
 
             with open("backup_banco_sql.json", "w", encoding="utf-8") as f:
                 json.dump(dados_completos, f, ensure_ascii=False, indent=4)
-
-            print("[SUCESSO] Banco de dados SQL exportado para 'backup_banco_sql.json' com sucesso!")
         except Exception as e:
-            print(f"[ERRO] Falha ao exportar banco SQL: {e}")
+            print(f"[ERRO] {e}")
 
 
 class ProfileSelectorFrame(ctk.CTkFrame):
-    """Tela de Seleção de Perfis com Validação SQL para o Root Master."""
-
     def __init__(self, parent, controller):
-        super().__init__(parent, fg_color=COLOR_BG_SURFACE, corner_radius=12)
+        super().__init__(parent, fg_color="transparent", corner_radius=12)
         self.controller = controller
         self.criar_interface()
 
     def criar_interface(self):
-        header = ctk.CTkFrame(self, fg_color=COLOR_BG_SURFACE, height=50, corner_radius=0)
+        header = ctk.CTkFrame(self, fg_color="transparent", height=50, corner_radius=0)
         header.pack(fill="x")
 
         lbl_titulo = ctk.CTkLabel(
@@ -427,8 +429,9 @@ class ProfileSelectorFrame(ctk.CTkFrame):
             img_avatar = None
             if foto_path and os.path.exists(foto_path):
                 try:
-                    pil_img = Image.open(foto_path)
-                    img_avatar = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(36, 36))
+                    pil_img = criar_avatar_circular(foto_path, tamanho=(36, 36))
+                    if pil_img:
+                        img_avatar = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(36, 36))
                 except Exception:
                     img_avatar = None
 
@@ -500,7 +503,6 @@ class ProfileSelectorFrame(ctk.CTkFrame):
             return
 
         if nome.lower() == "root master":
-            print("O usuário Root Master já é gerenciado pelo sistema.")
             return
 
         novo_id = f"p_{int(time.time())}"
@@ -509,7 +511,7 @@ class ProfileSelectorFrame(ctk.CTkFrame):
             "nome": nome,
             "cor_acento": "azul",
             "foto_perfil": "",
-            "fundo_imagem": "",
+            "cor_fundo": "#0F172A",
             "modo_layout": "grid",
             "atalhos_custom": []
         }
@@ -534,8 +536,6 @@ class ProfileSelectorFrame(ctk.CTkFrame):
 
 
 class DashboardFrame(ctk.CTkFrame):
-    """Painel Principal Dashboard Overlay."""
-
     def __init__(self, parent, controller):
         super().__init__(parent, fg_color="transparent", corner_radius=12)
         self.controller = controller
@@ -548,19 +548,19 @@ class DashboardFrame(ctk.CTkFrame):
         self.dynamic_accent_borders = []
         
         self.icone_foto_temp = ""
-        self.lbl_fundo_bg = None
+
+        self.video_path = None
+        self.video_rodando = False
+        self.video_pausado = False
+        self.video_thread = None
 
         self.criar_interface()
         self.atualizar_monitor_sistema()
 
     def criar_interface(self):
-        self.lbl_fundo_bg = ctk.CTkLabel(self, text="", fg_color="transparent")
-        self.lbl_fundo_bg.place(x=0, y=0, relwidth=1, relheight=1)
-        self.lbl_fundo_bg.lower()
-
         self.header_frame = ctk.CTkFrame(
             self,
-            fg_color=COLOR_BG_SURFACE,
+            fg_color="transparent",
             corner_radius=12,
             border_color=COLOR_BORDER,
             border_width=1,
@@ -677,7 +677,7 @@ class DashboardFrame(ctk.CTkFrame):
 
         self.frame_busca = ctk.CTkFrame(
             self,
-            fg_color=COLOR_BG_SURFACE,
+            fg_color="transparent",
             corner_radius=12,
             border_color=COLOR_BORDER,
             border_width=1,
@@ -702,7 +702,7 @@ class DashboardFrame(ctk.CTkFrame):
             text="📁 Buscar App",
             width=100,
             height=38,
-            fg_color="transparent",
+            fg_color=COLOR_BG_CARD,
             hover_color=COLOR_BORDER,
             text_color=COLOR_TEXT_PRIMARY,
             command=self.selecionar_executavel_direto,
@@ -725,7 +725,7 @@ class DashboardFrame(ctk.CTkFrame):
         self.tabview = ctk.CTkTabview(
             self,
             corner_radius=12,
-            fg_color=COLOR_BG_SURFACE,
+            fg_color="transparent",
             border_color=COLOR_BORDER,
             border_width=1,
             text_color=COLOR_TEXT_PRIMARY,
@@ -748,24 +748,16 @@ class DashboardFrame(ctk.CTkFrame):
         self.montar_aba_player_video()
         self.montar_aba_config()
 
-    def atualizar_fundo_tela(self, caminho_img):
-        if caminho_img and os.path.exists(caminho_img):
-            try:
-                pil_img = Image.open(caminho_img)
-                pil_img = pil_img.resize((920, 800), Image.Resampling.LANCZOS)
-                ctk_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(920, 800))
-                self.lbl_fundo_bg.configure(image=ctk_img)
-                return
-            except Exception as e:
-                print(f"[ERRO] Falha ao carregar fundo de tela: {e}")
-        self.lbl_fundo_bg.configure(image="")
-        
-
     def carregar_perfil(self, perfil):
         self.lbl_titulo.configure(text=f"OmniOverlay - {perfil['nome']}")
         self.aplicar_cor_acento(perfil.get("cor_acento", "azul"))
         self.atualizar_foto_avatar(perfil.get("foto_perfil", ""))
-        self.atualizar_fundo_tela(perfil.get("fundo_imagem", ""))
+        
+        if self.controller.modo_tema_atual == "light":
+            self.controller.atualizar_cor_fundo_raiz("#F1F5F9")
+        else:
+            self.controller.atualizar_cor_fundo_raiz(perfil.get("cor_fundo", "#0F172A"))
+            
         self.atualizar_atalhos_customizados()
 
     def atualizar_monitor_sistema(self):
@@ -792,20 +784,21 @@ class DashboardFrame(ctk.CTkFrame):
 
                 cor_ram = "#16A34A" if ram.percent < 70 else ("#EAB308" if ram.percent < 88 else "#EF4444")
                 self.bar_ram_detalhada.configure(progress_color=cor_ram)
-        except Exception as e:
-            print(f"[MONITOR] Erro: {e}")
+        except Exception:
+            pass
 
         self.after(1500, self.atualizar_monitor_sistema)
 
     def atualizar_foto_avatar(self, foto_path):
         if foto_path and os.path.exists(foto_path):
             try:
-                pil_img = Image.open(foto_path)
-                img_avatar = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(32, 32))
-                self.btn_avatar.configure(image=img_avatar, text="")
-                return
-            except Exception as e:
-                print(f"[ERRO] Falha ao carregar avatar: {e}")
+                pil_img = criar_avatar_circular(foto_path, tamanho=(32, 32))
+                if pil_img:
+                    img_avatar = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(32, 32))
+                    self.btn_avatar.configure(image=img_avatar, text="")
+                    return
+            except Exception:
+                pass
         self.btn_avatar.configure(image="", text="👤" if self.controller.perfil_ativo["nome"] != "Root Master" else "🛡️")
 
     def trocar_foto_perfil(self):
@@ -892,7 +885,7 @@ class DashboardFrame(ctk.CTkFrame):
             else:
                 subprocess.Popen(alvo, shell=True)
         except Exception as e:
-            print(f"[ERRO] Falha ao abrir alvo '{alvo}': {e}")
+            print(f"[ERRO] {e}")
 
     def montar_aba_hub(self):
         frame_adicionar = ctk.CTkFrame(self.tab_hub, fg_color=COLOR_BG_CARD, corner_radius=10, border_color=COLOR_BORDER, border_width=1)
@@ -1024,6 +1017,7 @@ class DashboardFrame(ctk.CTkFrame):
             ("🚀 Steam", "steam://open/main"),
             ("🛡️ Epic Games", "epicgames://"),
             ("💬 Discord", "https://discord.com/app"),
+            ("💻 Discord App", "discord://"),
             ("🎮 Roblox", "https://www.roblox.com"),
             ("🔴 Roblox App", "roblox://"),
             ("🌐 Poki Jogos", "https://poki.com"),
@@ -1212,7 +1206,7 @@ class DashboardFrame(ctk.CTkFrame):
             font=("Segoe UI", 11)
         )
         self.chat_historico.pack(fill="both", expand=True, pady=(0, 8))
-        self.chat_historico.insert("end", "OmniAI: Olá! Como posso te ajudar hoje com seus jogos, estudos ou tarefas?\n\n")
+        self.chat_historico.insert("end", "OmniAI: Olá! Pronto para a jogatina de hoje? Me pergunte sobre dicas de games, atalhos ou desempenho do PC!\n\n")
         self.chat_historico.configure(state="disabled")
 
         chat_input_frame = ctk.CTkFrame(ia_container, fg_color="transparent")
@@ -1220,7 +1214,7 @@ class DashboardFrame(ctk.CTkFrame):
 
         self.entry_chat = ctk.CTkEntry(
             chat_input_frame,
-            placeholder_text="Digite sua pergunta para a IA...",
+            placeholder_text="Digite sua pergunta sobre jogos...",
             height=38,
             fg_color=COLOR_INPUT_BG,
             text_color=COLOR_TEXT_PRIMARY,
@@ -1252,14 +1246,30 @@ class DashboardFrame(ctk.CTkFrame):
         self.chat_historico.insert("end", f"Você: {texto}\n")
         
         txt_lower = texto.lower()
-        if "jogo" in txt_lower or "jogar" in txt_lower:
-            resposta = "OmniAI: Para jogos, verifique a aba 'Central de Atalhos' na categoria de Jogos ou adicione seu executável favorito para acesso rápido!"
-        elif "olá" in txt_lower or "oi" in txt_lower:
-            resposta = "OmniAI: Olá! Tudo bien? Como posso tornar sua experiência com o OmniOverlay melhor hoje?"
-        elif "ajuda" in txt_lower:
-            resposta = "OmniAI: Posso te ajudar a gerenciar atalhos, monitorar seu hardware ou controlar o player de vídeo. O que deseja saber?"
+        
+        # --- REPERTÓRIO INTELIGENTE LOCAL SOBRE JOGOS E GERAL ---
+        if any(p in txt_lower for p in ["jogo", "jogar", "game", "games", "jogatina"]):
+            resposta = "OmniAI: 🎮 Os games são ótimos para relaxar! Você pode organizar seus jogos favoritos (como Steam, Epic Games, Roblox ou atalhos próprios) na aba 'Central de Atalhos' > 'Jogos & Plataformas'."
+        elif any(p in txt_lower for p in ["fps", "trava", "lag", "lento", "otimizar", "desempenho", "rodar"]):
+            resposta = "OmniAI: ⚡ Para melhorar o desempenho nos jogos, verifique o uso do seu processador e memória RAM no monitor do topo do painel, feche abas desnecessárias do navegador e ajuste os gráficos para focar em taxa de quadros (FPS)."
+        elif any(p in txt_lower for p in ["minecraft", "bloco", "sobrevivencia"]):
+            resposta = "OmniAI: 🧱 Minecraft é clássico! A dica de ouro é sempre fazer uma base iluminada antes da primeira noite e nunca cavar direto para baixo."
+        elif any(p in txt_lower for p in ["roblox", "blox", "robux"]):
+            resposta = "OmniAI: 🔴 Roblox tem milhares de experiências incríveis! Você pode abrir o launcher oficial rapidamente pela aba de Jogos do nosso overlay."
+        elif any(p in txt_lower for p in ["steam", "valves"]):
+            resposta = "OmniAI: 🚀 A Steam é a maior plataforma de PC gaming. Dica: fique de olho nas promoções sazonais de verão e inverno para garantir ótimos jogos por um preço menor!"
+        elif any(p in txt_lower for p in ["epic", "epic games", "jogo gratis"]):
+            resposta = "OmniAI: 🎁 A Epic Games Store dá jogos de graça todas as quintas-feiras! Vale sempre a pena dar uma olhada no site deles para resgatar os títulos."
+        elif any(p in txt_lower for p in ["melhor", "indicação", "indicar", "recomenda", "jogos bons"]):
+            resposta = "OmniAI: 🏆 Depende do seu estilo! Se gosta de ação, jogos de tiro e aventura em mundo aberto são ótimos. Se prefere relaxar, jogos de simuladores, indies ou de construção fazem muito sucesso."
+        elif any(p in txt_lower for p in ["multiplayer", "online", "amigos", "co-op"]):
+            resposta = "OmniAI: 👥 Jogar com amigos é outra experiência! Jogos competitivos testam a mira e a estratégia, enquanto os cooperativos focam no trabalho em equipe (e em boas risadas)."
+        elif any(p in txt_lower for p in ["olá", "oi", "bom dia", "boa tarde", "boa noite", "eae"]):
+            resposta = "OmniAI: Olá! Pronto para a jogatina de hoje? Me pergunte sobre dicas de games, atalhos ou desempenho do PC!"
+        elif any(p in txt_lower for p in ["ajuda", "socorro", "o que fazer", "comandos"]):
+            resposta = "OmniAI: 🛠️ Você pode me perguntar sobre: Jogos, FPS/Desempenho, Steam, Roblox, Minecraft, Epic Games ou como usar o OmniOverlay!"
         else:
-            resposta = f"OmniAI: Compreendi sua solicitação sobre '{texto}'. Como assistente do OmniOverlay, estou aqui para otimizar suas tarefas e organizar seus aplicativos!"
+            resposta = f"OmniAI: Entendi o que você disse sobre '{texto}'. Como sou a IA local do OmniOverlay, adoro falar sobre games, atalhos e organização de PC. Quer uma dica sobre algum jogo específico?"
 
         self.chat_historico.insert("end", f"{resposta}\n\n")
         self.chat_historico.configure(state="disabled")
@@ -1275,13 +1285,10 @@ class DashboardFrame(ctk.CTkFrame):
             text="🎬 Player de Vídeo em Overlay",
             font=("Segoe UI", 13, "bold"),
             text_color=COLOR_TEXT_PRIMARY
-        ).pack(anchor="w", pady=(0, 8))
-
-        self.videoplayer = TkinterVideo(video_container, scaled=True, background="#0F172A")
-        self.videoplayer.pack(fill="both", expand=True, pady=(0, 8))
+        ).pack(anchor="w", pady=(0, 4))
 
         controles_video = ctk.CTkFrame(video_container, fg_color=COLOR_BG_CARD, corner_radius=10, border_color=COLOR_BORDER, border_width=1)
-        controles_video.pack(fill="x", pady=4)
+        controles_video.pack(side="bottom", fill="x", pady=(4, 0))
         self.dynamic_accent_borders.append(controles_video)
 
         btn_escolher_video = ctk.CTkButton(
@@ -1297,7 +1304,7 @@ class DashboardFrame(ctk.CTkFrame):
         btn_escolher_video.pack(side="left", padx=8, pady=8)
         self.dynamic_accent_buttons.append(btn_escolher_video)
 
-        btn_play = ctk.CTkButton(
+        self.btn_play_video = ctk.CTkButton(
             controles_video,
             text="▶️ Play / Pause",
             width=110,
@@ -1307,7 +1314,10 @@ class DashboardFrame(ctk.CTkFrame):
             text_color=COLOR_TEXT_PRIMARY,
             command=self.toggle_play_video
         )
-        btn_play.pack(side="left", padx=4, pady=8)
+        self.btn_play_video.pack(side="left", padx=4, pady=8)
+
+        self.lbl_video_display = ctk.CTkLabel(video_container, text="Nenhum vídeo carregado", fg_color="#0F172A", corner_radius=8)
+        self.lbl_video_display.pack(side="top", fill="both", expand=True, pady=(0, 4))
 
     def carregar_arquivo_video(self):
         caminho = filedialog.askopenfilename(
@@ -1315,26 +1325,70 @@ class DashboardFrame(ctk.CTkFrame):
             filetypes=[("Arquivos de Vídeo", "*.mp4 *.avi *.mkv *.mov"), ("Todos os Arquivos", "*.*")]
         )
         if caminho:
+            self.video_rodando = False
+            time.sleep(0.1) 
+            self.video_path = caminho
+            self.video_rodando = True
+            self.video_pausado = False
+            self.btn_play_video.configure(text="⏸️ Pausar")
+            
+            self.video_thread = threading.Thread(target=self._executar_loop_video, daemon=True)
+            self.video_thread.start()
+
+    def _executar_loop_video(self):
+        cap = cv2.VideoCapture(self.video_path)
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        if fps <= 0 or fps > 60:
+            fps = 30
+        delay = 1.0 / fps
+
+        while self.video_rodando and cap.isOpened():
+            if self.video_pausado:
+                time.sleep(0.1)
+                continue
+
+            ret, frame = cap.read()
+            if not ret:
+                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                continue
+
             try:
-                self.videoplayer.load(caminho)
-                self.videoplayer.play()
-            except Exception as e:
-                print(f"[ERRO] Falha ao carregar vídeo: {e}")
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                pil_img = Image.fromarray(frame_rgb)
+                
+                max_w = max(self.lbl_video_display.winfo_width(), 300)
+                max_h = max(self.lbl_video_display.winfo_height(), 200)
+                
+                orig_w, orig_h = pil_img.size
+                ratio = min(max_w / orig_w, max_h / orig_h)
+                new_w = int(orig_w * ratio)
+                new_h = int(orig_h * ratio)
+                
+                pil_img = pil_img.resize((new_w, new_h), Image.Resampling.BILINEAR)
+                ctk_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(new_w, new_h))
+                
+                self.after(0, lambda img=ctk_img: self.lbl_video_display.configure(image=img, text=""))
+            except Exception:
+                pass
+
+            time.sleep(delay)
+
+        cap.release()
 
     def toggle_play_video(self):
-        try:
-            if self.videoplayer.is_paused():
-                self.videoplayer.play()
-            else:
-                self.videoplayer.pause()
-        except Exception:
-            pass
+        if not self.video_path:
+            return
+        
+        self.video_pausado = not self.video_pausado
+        if self.video_pausado:
+            self.btn_play_video.configure(text="▶️ Retomar")
+        else:
+            self.btn_play_video.configure(text="⏸️ Pausar")
 
     def montar_aba_config(self):
         config_container = ctk.CTkScrollableFrame(self.tab_config, fg_color="transparent")
         config_container.pack(fill="both", expand=True, padx=4, pady=4)
 
-        # ----------------- PAINEL ROOT MASTER (SQL -> JSON) -----------------
         ctk.CTkLabel(
             config_container,
             text="🛡️ Painel Administrativo (Root Master)",
@@ -1366,7 +1420,6 @@ class DashboardFrame(ctk.CTkFrame):
         )
         btn_abrir_adm.pack(anchor="w", padx=12, pady=(0, 10))
 
-        # ----------------- APARÊNCIA & TEMAS -----------------
         ctk.CTkLabel(
             config_container,
             text="⚙️ Aparência & Temas de Cores",
@@ -1403,33 +1456,48 @@ class DashboardFrame(ctk.CTkFrame):
             )
             btn_cor.pack(side="left", padx=4)
 
-        # ----------------- PLANO DE FUNDO -----------------
         ctk.CTkLabel(
             config_container,
-            text="🖼️ Plano de Fundo Customizado",
+            text="🎨 Cor Sólida de Fundo do Perfil",
             font=("Segoe UI", 12, "bold"),
             text_color=COLOR_TEXT_PRIMARY
         ).pack(anchor="w", padx=8, pady=(16, 8))
 
-        frame_fundo = ctk.CTkFrame(config_container, fg_color=COLOR_BG_CARD, corner_radius=10, border_color=COLOR_BORDER, border_width=1)
-        frame_fundo.pack(fill="x", padx=4, pady=4, ipady=4)
-        self.dynamic_accent_borders.append(frame_fundo)
+        frame_fundo_cor = ctk.CTkFrame(config_container, fg_color=COLOR_BG_CARD, corner_radius=10, border_color=COLOR_BORDER, border_width=1)
+        frame_fundo_cor.pack(fill="x", padx=4, pady=4, ipady=4)
+        self.dynamic_accent_borders.append(frame_fundo_cor)
 
-        btn_escolher_fundo = ctk.CTkButton(
-            frame_fundo,
-            text="📁 Escolher Imagem de Fundo",
-            width=200,
-            height=34,
-            fg_color="#2563EB",
-            hover_color="#1D4ED8",
-            text_color="#FFFFFF",
-            font=("Segoe UI", 11, "bold"),
-            command=self.selecionar_fundo_customizado
-        )
-        btn_escolher_fundo.pack(anchor="w", padx=12, pady=10)
-        self.dynamic_accent_buttons.append(btn_escolher_fundo)
+        ctk.CTkLabel(
+            frame_fundo_cor,
+            text="Selecione um estilo de cor para o plano de fundo:",
+            font=("Segoe UI", 11),
+            text_color=COLOR_TEXT_PRIMARY
+        ).pack(anchor="w", padx=12, pady=(8, 4))
 
-        # ----------------- MONITORAMENTO DE HARDWARE -----------------
+        botoes_fundo_frame = ctk.CTkFrame(frame_fundo_cor, fg_color="transparent")
+        botoes_fundo_frame.pack(anchor="w", padx=12, pady=(0, 10))
+
+        cores_fundo_opcoes = [
+            ("Dark Midnight", "#0F172A"),
+            ("Dark Slate", "#1E293B"),
+            ("Azul Profundo", "#1E3A8A"),
+            ("Roxo Noturno", "#3B0764"),
+            ("Verde Militar", "#064E3B")
+        ]
+        for nome_c, hex_c in cores_fundo_opcoes:
+            btn_f_cor = ctk.CTkButton(
+                botoes_fundo_frame,
+                text=nome_c,
+                width=110,
+                height=30,
+                fg_color=hex_c,
+                hover_color=hex_c,
+                text_color="#FFFFFF",
+                font=("Segoe UI", 10, "bold"),
+                command=lambda hc=hex_c: self.alterar_cor_fundo_perfil(hc)
+            )
+            btn_f_cor.pack(side="left", padx=3)
+
         ctk.CTkLabel(
             config_container,
             text="📊 Monitoramento Detalhado de Hardware",
@@ -1458,43 +1526,20 @@ class DashboardFrame(ctk.CTkFrame):
         self.lbl_ram_valor_detalhado.pack(anchor="e", padx=12)
 
     def acao_abrir_painel_adm(self):
-        # Abre a janela modal segura de senha. Se acertar, abre a janela PainelAdmWindow
         JanelaSenhaModal(self.controller, lambda: PainelAdmWindow(self.controller))
 
-    def selecionar_fundo_customizado(self):
-        caminho = filedialog.askopenfilename(
-            title="Escolha a Imagem de Fundo",
-            filetypes=[("Imagens", "*.png *.jpg *.jpeg *.bmp")]
-        )
-        if caminho and self.controller.perfil_ativo:
-            self.controller.perfil_ativo["fundo_imagem"] = caminho
+    def alterar_cor_fundo_perfil(self, hex_cor):
+        if self.controller.modo_tema_atual == "light":
+            print("[AVISO] Você está no Modo Claro. Mude para o Modo Escuro para customizar cores sólidas escuras de fundo.")
+            return
+
+        if self.controller.perfil_ativo:
+            self.controller.perfil_ativo["cor_fundo"] = hex_cor
             AccountManager.salvar_dados(self.controller.dados_config)
-            self.atualizar_fundo_tela(caminho)
-            
-    def atualizar_fundo_tela(self, caminho_img):
-        if caminho_img and os.path.exists(caminho_img):
-            try:
-                pil_img = Image.open(caminho_img)
-                pil_img = pil_img.resize((920, 800), Image.Resampling.LANCZOS)
-                
-                # Criação correta do objeto CTkImage para evitar avisos e renderizar na tela
-                self.imagem_fundo_atual = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(920, 800))
-                
-                self.lbl_fundo_bg.configure(image=self.imagem_fundo_atual, text="")
-                self.lbl_fundo_bg.place(x=0, y=0, relwidth=1, relheight=1)
-                self.lbl_fundo_bg.lower()  # Mantém estritamente no fundo
-                return
-            except Exception as e:
-                print(f"[ERRO] Falha ao carregar fundo de tela: {e}")
-        
-        self.imagem_fundo_atual = None
-        self.lbl_fundo_bg.configure(image="", text="")
-        
-    
+            self.controller.atualizar_cor_fundo_raiz(hex_cor)
+
 
 class OmniOverlayApp(ctk.CTk):
-    """Janela Principal e Controlador de Estados do OmniOverlay."""
-
     def __init__(self):
         super().__init__()
 
@@ -1506,23 +1551,29 @@ class OmniOverlayApp(ctk.CTk):
 
         self.title("OmniOverlay")
         self.geometry("920x800")
-        self.overrideredirect(True)
+        self.overrideredirect(False)
         self.attributes("-alpha", 0.98)
-        self.configure(bg_color=COLOR_BG_SURFACE)
 
         self.perfil_ativo = None
         
-        self.container = ctk.CTkFrame(self, fg_color="transparent")
+        cor_inicial_container = "#F1F5F9" if self.modo_tema_atual == "light" else "#0F172A"
+        self.container = ctk.CTkFrame(self, fg_color=cor_inicial_container)
         self.container.pack(fill="both", expand=True)
 
-        self.profile_frame = ProfileSelectorFrame(self.container, self)
-        self.dashboard_frame = DashboardFrame(self.container, self)
+        self.profile_frame = None
+        self.dashboard_frame = None
 
         self.hotkey_manager = GlobalHotkeyManager(self)
         self.hotkey_manager.iniciar()
 
         self.centralizar_janela(920, 800)
         self.verificar_perfil_inicial()
+
+    def atualizar_cor_fundo_raiz(self, hex_cor):
+        try:
+            self.container.configure(fg_color=hex_cor)
+        except Exception as e:
+            print(f"[ERRO] {e}")
 
     def centralizar_janela(self, largura, altura):
         largura_tela = self.winfo_screenwidth()
@@ -1556,13 +1607,39 @@ class OmniOverlayApp(ctk.CTk):
         self.dados_config["ultimo_perfil"] = perfil["id"]
         AccountManager.salvar_dados(self.dados_config)
 
-        self.profile_frame.pack_forget()
+        if self.profile_frame:
+            self.profile_frame.destroy()
+            self.profile_frame = None
+
+        if self.dashboard_frame:
+            self.dashboard_frame.destroy()
+
+        self.dashboard_frame = DashboardFrame(self.container, self)
         self.dashboard_frame.pack(fill="both", expand=True)
         self.dashboard_frame.carregar_perfil(perfil)
+        
+        if self.modo_tema_atual == "light":
+            self.atualizar_cor_fundo_raiz("#F1F5F9")
+        else:
+            self.atualizar_cor_fundo_raiz(perfil.get("cor_fundo", "#0F172A"))
 
     def abrir_seletor_perfis(self):
-        self.dashboard_frame.pack_forget()
+        if self.dashboard_frame:
+            self.dashboard_frame.destroy()
+            self.dashboard_frame = None
+
+        if self.profile_frame:
+            self.profile_frame.destroy()
+
+        self.profile_frame = ProfileSelectorFrame(self.container, self)
         self.profile_frame.pack(fill="both", expand=True)
+
+        if self.modo_tema_atual == "light":
+            self.atualizar_cor_fundo_raiz("#F1F5F9")
+        else:
+            cor_atual = self.perfil_ativo.get("cor_fundo", "#0F172A") if self.perfil_ativo else "#0F172A"
+            self.atualizar_cor_fundo_raiz(cor_atual)
+
         self.profile_frame.atualizar_lista()
 
     def alternar_tema_global(self):
@@ -1575,14 +1652,46 @@ class OmniOverlayApp(ctk.CTk):
         self.dados_config["modo_tema"] = self.modo_tema_atual
         AccountManager.salvar_dados(self.dados_config)
 
-        self.dashboard_frame.destroy()
-        self.dashboard_frame = DashboardFrame(self.container, self)
-        
-        if self.perfil_ativo:
-            self.dashboard_frame.pack(fill="both", expand=True)
-            self.dashboard_frame.carregar_perfil(self.perfil_ativo)
+        if self.modo_tema_atual == "light":
+            self.atualizar_cor_fundo_raiz("#F1F5F9")
+        else:
+            if self.perfil_ativo:
+                self.atualizar_cor_fundo_raiz(self.perfil_ativo.get("cor_fundo", "#0F172A"))
+
+        if self.dashboard_frame:
+            self.dashboard_frame.destroy()
+            self.dashboard_frame = DashboardFrame(self.container, self)
+            if self.perfil_ativo:
+                self.dashboard_frame.pack(fill="both", expand=True)
+                self.dashboard_frame.carregar_perfil(self.perfil_ativo)
+        elif self.profile_frame:
+            self.profile_frame.destroy()
+            self.profile_frame = ProfileSelectorFrame(self.container, self)
+            self.profile_frame.pack(fill="both", expand=True)
+            self.profile_frame.atualizar_lista()
 
 
 if __name__ == "__main__":
     app = OmniOverlayApp()
     app.mainloop()
+    
+    
+def atualizar_fundo_tela(self, caminho_img):
+    if caminho_img and os.path.exists(caminho_img):
+        try:
+                pil_img = Image.open(caminho_img)
+                pil_img = pil_img.resize((920, 800), Image.Resampling.LANCZOS)
+                
+                # Salvamos a referência para evitar que o Garbage Collector apague a imagem
+                self.imagem_fundo_atual = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(920, 800))
+                
+                self.lbl_fundo_bg.configure(image=self.imagem_fundo_atual, text="")
+                self.lbl_fundo_bg.place(x=0, y=0, relwidth=1, relheight=1)
+                self.lbl_fundo_bg.lower() # Mantém estritamente no fundo
+                return
+        except Exception as e:
+                print(f"[ERRO] Falha ao carregar fundo de tela: {e}")
+        
+        self.imagem_fundo_atual = None
+        self.lbl_fundo_bg.configure(image="", text="")
+        
