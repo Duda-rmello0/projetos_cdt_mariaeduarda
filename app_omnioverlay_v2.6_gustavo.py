@@ -735,7 +735,6 @@ class DashboardFrame(ctk.CTkFrame):
         self.aplicar_cor_acento(perfil.get("cor_acento", "azul"))
         self.atualizar_foto_avatar(perfil.get("foto_perfil", ""))
         
-        # Respeita o modo claro/escuro global para o fundo caso esteja no padrão, senão aplica a cor customizada
         if self.controller.modo_tema_atual == "light":
             self.controller.atualizar_cor_fundo_raiz("#F1F5F9")
         else:
@@ -1522,13 +1521,12 @@ class OmniOverlayApp(ctk.CTk):
 
         self.perfil_ativo = None
         
-        # Container principal com cor adaptativa inicial baseada no tema
         cor_inicial_container = "#F1F5F9" if self.modo_tema_atual == "light" else "#0F172A"
         self.container = ctk.CTkFrame(self, fg_color=cor_inicial_container)
         self.container.pack(fill="both", expand=True)
 
-        self.profile_frame = ProfileSelectorFrame(self.container, self)
-        self.dashboard_frame = DashboardFrame(self.container, self)
+        self.profile_frame = None
+        self.dashboard_frame = None
 
         self.hotkey_manager = GlobalHotkeyManager(self)
         self.hotkey_manager.iniciar()
@@ -1574,7 +1572,14 @@ class OmniOverlayApp(ctk.CTk):
         self.dados_config["ultimo_perfil"] = perfil["id"]
         AccountManager.salvar_dados(self.dados_config)
 
-        self.profile_frame.pack_forget()
+        if self.profile_frame:
+            self.profile_frame.destroy()
+            self.profile_frame = None
+
+        if self.dashboard_frame:
+            self.dashboard_frame.destroy()
+
+        self.dashboard_frame = DashboardFrame(self.container, self)
         self.dashboard_frame.pack(fill="both", expand=True)
         self.dashboard_frame.carregar_perfil(perfil)
         
@@ -1584,8 +1589,22 @@ class OmniOverlayApp(ctk.CTk):
             self.atualizar_cor_fundo_raiz(perfil.get("cor_fundo", "#0F172A"))
 
     def abrir_seletor_perfis(self):
-        self.dashboard_frame.pack_forget()
+        if self.dashboard_frame:
+            self.dashboard_frame.destroy()
+            self.dashboard_frame = None
+
+        if self.profile_frame:
+            self.profile_frame.destroy()
+
+        self.profile_frame = ProfileSelectorFrame(self.container, self)
         self.profile_frame.pack(fill="both", expand=True)
+
+        if self.modo_tema_atual == "light":
+            self.atualizar_cor_fundo_raiz("#F1F5F9")
+        else:
+            cor_atual = self.perfil_ativo.get("cor_fundo", "#0F172A") if self.perfil_ativo else "#0F172A"
+            self.atualizar_cor_fundo_raiz(cor_atual)
+
         self.profile_frame.atualizar_lista()
 
     def alternar_tema_global(self):
@@ -1598,19 +1617,24 @@ class OmniOverlayApp(ctk.CTk):
         self.dados_config["modo_tema"] = self.modo_tema_atual
         AccountManager.salvar_dados(self.dados_config)
 
-        # Ajusta instantaneamente a cor do container principal conforme o tema alternado
         if self.modo_tema_atual == "light":
             self.atualizar_cor_fundo_raiz("#F1F5F9")
         else:
             if self.perfil_ativo:
                 self.atualizar_cor_fundo_raiz(self.perfil_ativo.get("cor_fundo", "#0F172A"))
 
-        self.dashboard_frame.destroy()
-        self.dashboard_frame = DashboardFrame(self.container, self)
-        
-        if self.perfil_ativo:
-            self.dashboard_frame.pack(fill="both", expand=True)
-            self.dashboard_frame.carregar_perfil(self.perfil_ativo)
+        # Atualiza a tela ativa dependendo de onde o usuário está no momento
+        if self.dashboard_frame:
+            self.dashboard_frame.destroy()
+            self.dashboard_frame = DashboardFrame(self.container, self)
+            if self.perfil_ativo:
+                self.dashboard_frame.pack(fill="both", expand=True)
+                self.dashboard_frame.carregar_perfil(self.perfil_ativo)
+        elif self.profile_frame:
+            self.profile_frame.destroy()
+            self.profile_frame = ProfileSelectorFrame(self.container, self)
+            self.profile_frame.pack(fill="both", expand=True)
+            self.profile_frame.atualizar_lista()
 
 
 if __name__ == "__main__":
