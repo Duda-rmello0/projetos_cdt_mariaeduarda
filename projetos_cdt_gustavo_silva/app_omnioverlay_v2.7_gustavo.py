@@ -14,7 +14,7 @@ import threading
 import sqlite3
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
-from PIL import Image, ImageTk
+from PIL import Image, ImageTk, ImageOps, ImageDraw
 import cv2
 
 import psutil
@@ -70,6 +70,23 @@ def inicializar_banco_sql():
         conexao.close()
     except Exception as e:
         print(f"[ERRO SQL] {e}")
+
+
+def criar_avatar_circular(caminho_imagem, tamanho=(40, 40)):
+    try:
+        img = Image.open(caminho_imagem).convert("RGBA")
+        img = ImageOps.fit(img, tamanho, Image.Resampling.LANCZOS)
+        
+        mascara = Image.new("L", tamanho, 0)
+        draw = ImageDraw.Draw(mascara)
+        draw.ellipse((0, 0, tamanho[0], tamanho[1]), fill=255)
+        
+        resultado = Image.new("RGBA", tamanho, (0, 0, 0, 0))
+        resultado.paste(img, (0, 0), mascara)
+        return resultado
+    except Exception as e:
+        print(f"[ERRO AVATAR] {e}")
+        return None
 
 
 class GlobalHotkeyManager:
@@ -412,8 +429,9 @@ class ProfileSelectorFrame(ctk.CTkFrame):
             img_avatar = None
             if foto_path and os.path.exists(foto_path):
                 try:
-                    pil_img = Image.open(foto_path)
-                    img_avatar = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(36, 36))
+                    pil_img = criar_avatar_circular(foto_path, tamanho=(36, 36))
+                    if pil_img:
+                        img_avatar = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(36, 36))
                 except Exception:
                     img_avatar = None
 
@@ -774,10 +792,11 @@ class DashboardFrame(ctk.CTkFrame):
     def atualizar_foto_avatar(self, foto_path):
         if foto_path and os.path.exists(foto_path):
             try:
-                pil_img = Image.open(foto_path)
-                img_avatar = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(32, 32))
-                self.btn_avatar.configure(image=img_avatar, text="")
-                return
+                pil_img = criar_avatar_circular(foto_path, tamanho=(32, 32))
+                if pil_img:
+                    img_avatar = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(32, 32))
+                    self.btn_avatar.configure(image=img_avatar, text="")
+                    return
             except Exception:
                 pass
         self.btn_avatar.configure(image="", text="👤" if self.controller.perfil_ativo["nome"] != "Root Master" else "🛡️")
@@ -1187,7 +1206,7 @@ class DashboardFrame(ctk.CTkFrame):
             font=("Segoe UI", 11)
         )
         self.chat_historico.pack(fill="both", expand=True, pady=(0, 8))
-        self.chat_historico.insert("end", "OmniAI: Olá! Como posso te ajudar hoje com seus jogos, estudos ou tarefas?\n\n")
+        self.chat_historico.insert("end", "OmniAI: Olá! Pronto para a jogatina de hoje? Me pergunte sobre dicas de games, atalhos ou desempenho do PC!\n\n")
         self.chat_historico.configure(state="disabled")
 
         chat_input_frame = ctk.CTkFrame(ia_container, fg_color="transparent")
@@ -1195,7 +1214,7 @@ class DashboardFrame(ctk.CTkFrame):
 
         self.entry_chat = ctk.CTkEntry(
             chat_input_frame,
-            placeholder_text="Digite sua pergunta para a IA...",
+            placeholder_text="Digite sua pergunta sobre jogos...",
             height=38,
             fg_color=COLOR_INPUT_BG,
             text_color=COLOR_TEXT_PRIMARY,
@@ -1227,14 +1246,30 @@ class DashboardFrame(ctk.CTkFrame):
         self.chat_historico.insert("end", f"Você: {texto}\n")
         
         txt_lower = texto.lower()
-        if "jogo" in txt_lower or "jogar" in txt_lower:
-            resposta = "OmniAI: Para jogos, verifique a aba 'Central de Atalhos' na categoria de Jogos ou adicione seu executável favorito para acesso rápido!"
-        elif "olá" in txt_lower or "oi" in txt_lower:
-            resposta = "OmniAI: Olá! Tudo bem? Como posso tornar sua experiência com o OmniOverlay melhor hoje?"
-        elif "ajuda" in txt_lower:
-            resposta = "OmniAI: Posso te ajudar a gerenciar atalhos, monitorar seu hardware ou controlar o player de vídeo. O que deseja saber?"
+        
+        # --- REPERTÓRIO INTELIGENTE LOCAL SOBRE JOGOS E GERAL ---
+        if any(p in txt_lower for p in ["jogo", "jogar", "game", "games", "jogatina"]):
+            resposta = "OmniAI: 🎮 Os games são ótimos para relaxar! Você pode organizar seus jogos favoritos (como Steam, Epic Games, Roblox ou atalhos próprios) na aba 'Central de Atalhos' > 'Jogos & Plataformas'."
+        elif any(p in txt_lower for p in ["fps", "trava", "lag", "lento", "otimizar", "desempenho", "rodar"]):
+            resposta = "OmniAI: ⚡ Para melhorar o desempenho nos jogos, verifique o uso do seu processador e memória RAM no monitor do topo do painel, feche abas desnecessárias do navegador e ajuste os gráficos para focar em taxa de quadros (FPS)."
+        elif any(p in txt_lower for p in ["minecraft", "bloco", "sobrevivencia"]):
+            resposta = "OmniAI: 🧱 Minecraft é clássico! A dica de ouro é sempre fazer uma base iluminada antes da primeira noite e nunca cavar direto para baixo."
+        elif any(p in txt_lower for p in ["roblox", "blox", "robux"]):
+            resposta = "OmniAI: 🔴 Roblox tem milhares de experiências incríveis! Você pode abrir o launcher oficial rapidamente pela aba de Jogos do nosso overlay."
+        elif any(p in txt_lower for p in ["steam", "valves"]):
+            resposta = "OmniAI: 🚀 A Steam é a maior plataforma de PC gaming. Dica: fique de olho nas promoções sazonais de verão e inverno para garantir ótimos jogos por um preço menor!"
+        elif any(p in txt_lower for p in ["epic", "epic games", "jogo gratis"]):
+            resposta = "OmniAI: 🎁 A Epic Games Store dá jogos de graça todas as quintas-feiras! Vale sempre a pena dar uma olhada no site deles para resgatar os títulos."
+        elif any(p in txt_lower for p in ["melhor", "indicação", "indicar", "recomenda", "jogos bons"]):
+            resposta = "OmniAI: 🏆 Depende do seu estilo! Se gosta de ação, jogos de tiro e aventura em mundo aberto são ótimos. Se prefere relaxar, jogos de simuladores, indies ou de construção fazem muito sucesso."
+        elif any(p in txt_lower for p in ["multiplayer", "online", "amigos", "co-op"]):
+            resposta = "OmniAI: 👥 Jogar com amigos é outra experiência! Jogos competitivos testam a mira e a estratégia, enquanto os cooperativos focam no trabalho em equipe (e em boas risadas)."
+        elif any(p in txt_lower for p in ["olá", "oi", "bom dia", "boa tarde", "boa noite", "eae"]):
+            resposta = "OmniAI: Olá! Pronto para a jogatina de hoje? Me pergunte sobre dicas de games, atalhos ou desempenho do PC!"
+        elif any(p in txt_lower for p in ["ajuda", "socorro", "o que fazer", "comandos"]):
+            resposta = "OmniAI: 🛠️ Você pode me perguntar sobre: Jogos, FPS/Desempenho, Steam, Roblox, Minecraft, Epic Games ou como usar o OmniOverlay!"
         else:
-            resposta = f"OmniAI: Compreendi sua solicitação sobre '{texto}'. Como assistente do OmniOverlay, estou aqui para otimizar suas tarefas e organizar seus aplicativos!"
+            resposta = f"OmniAI: Entendi o que você disse sobre '{texto}'. Como sou a IA local do OmniOverlay, adoro falar sobre games, atalhos e organização de PC. Quer uma dica sobre algum jogo específico?"
 
         self.chat_historico.insert("end", f"{resposta}\n\n")
         self.chat_historico.configure(state="disabled")
@@ -1623,7 +1658,6 @@ class OmniOverlayApp(ctk.CTk):
             if self.perfil_ativo:
                 self.atualizar_cor_fundo_raiz(self.perfil_ativo.get("cor_fundo", "#0F172A"))
 
-        # Atualiza a tela ativa dependendo de onde o usuário está no momento
         if self.dashboard_frame:
             self.dashboard_frame.destroy()
             self.dashboard_frame = DashboardFrame(self.container, self)
